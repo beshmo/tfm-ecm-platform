@@ -1,120 +1,272 @@
 # TFM - Enterprise Content Management Platform (ECMP)
 
-The Enterprise Content Management Platform (ECMP) is an open-source, cloud-native, enterprise content management platform built on Kubernetes, Linux containers, and Twelve-Factor principles, released under the Apache License 2.0 to encourage community adoption, commercial usage, and ecosystem growth.
+ECMP is a cloud-native Enterprise Content Management Platform designed as the final project for a TFM academic work. The repository will contain the platform implementation, but the project is currently in the architecture and specification phase.
 
-## 1. Overview
+The goal is to build a portfolio-ready system that demonstrates enterprise architecture, microservices, frontend-driven content management, asynchronous publication workflows, containerized deployment, and Kubernetes-oriented operations.
 
-The platform is designed around stateless application services running in containers, enabling elastic scaling and high availability in Kubernetes-based environments.
+## Current Status
 
-Content models and content instances are defined using YAML, allowing schema-driven development and a high degree of flexibility without requiring code changes for most content structure modifications.
+This project is not implemented yet.
 
-The platform follows a staged content lifecycle with separate Management and Delivery environments and asynchronous publication workflows.
+At this stage, the repository contains the initial architectural definition and project direction. Source code, service scaffolding, infrastructure manifests, and development instructions will be added in later phases.
 
-ECMP is an open-source, cloud-native enterprise content management platform built on Kubernetes, Linux containers, and Twelve-Factor principles, released under the Apache License 2.0 to encourage community adoption, commercial usage, and ecosystem growth.
+## Objectives
 
----
-
-# 2. Objectives
-
-The primary objectives of the platform are:
+The main objectives of ECMP are:
 
 * Provide enterprise-grade content management capabilities.
+* Provide a frontend for content authors and administrators.
+* Use a microservices architecture from the beginning.
 * Support horizontal scaling through stateless application services.
 * Use schema-driven content definitions.
 * Enable asynchronous publishing and unpublishing operations.
-* Support cloud-native deployment patterns.
-* Facilitate AI-assisted development through Specification-Driven Development (SDD).
-* Maintain a clear separation between content authoring and content delivery.
+* Separate content authoring from public content delivery.
+* Follow cloud-native and Twelve-Factor application principles.
+* Provide a clear academic and professional portfolio case study.
 
----
+## High-Level Architecture
 
-# 3. High-Level Architecture
+ECMP separates content management from content delivery. Authors use a Management Frontend to create, edit, approve, publish, and unpublish content in the Management Stage. Public consumers read published content from the Delivery Stage. Publication between both stages is asynchronous and event-driven.
 
 ```text
 +--------------------------------------------------+
-|                Management Stage                  |
+|                 Management Stage                 |
 +--------------------------------------------------+
 
+        +-----------------------+
+        | Management Frontend   |
+        +-----------+-----------+
+                    |
+                    v
+        +-----------------------+
+        | API Gateway           |
+        +-----------+-----------+
+                    |
+                    v
         +-----------------------+
         | Management API        |
         +-----------+-----------+
                     |
                     v
-
               MongoDB
-         (Authoring Content)
-
+        (Authoring Content)
                     |
-                    |
+                    v
              Publish Request
                     |
                     v
-
-               RabbitMQ
-
+              RabbitMQ
                     |
                     v
-
 +--------------------------------------------------+
-|                 Delivery Stage                   |
+|                  Delivery Stage                  |
 +--------------------------------------------------+
 
-       +------------------------+
-       | Publication Worker     |
-       +------------+-----------+
+        +-----------------------+
+        | Publication Worker    |
+        +-----------+-----------+
                     |
                     v
-
               MongoDB
         (Published Content)
-
                     |
                     v
-
-           Delivery API
-
+              Delivery API
 ```
 
----
+The exact physical separation between Management and Delivery storage is still under review. The implementation may use separate databases, separate collections, or separate MongoDB instances depending on the final design.
 
-# 4. Core Architectural Principles
+## Planned Monorepo Structure
 
-## 4.1 Stateless Services
+The project will use a single repository with multiple independently deployable services.
 
-All application services must be stateless.
+```text
+ecmp-platform/
+|-- apps/
+|   `-- management-frontend/
+|       `-- src/app/
+|           |-- core/
+|           |-- shared/
+|           `-- features/
+|               |-- content/
+|               |-- content-types/
+|               `-- publication/
+|
+|-- services/
+|   |-- api-gateway/
+|   |-- identity-service/
+|   |-- content-service/
+|   |-- content-type-service/
+|   |-- publication-service/
+|   |-- publication-worker/
+|   `-- delivery-service/
+|
+|-- packages/
+|   |-- shared-types/
+|   |-- shared-events/
+|   |-- shared-auth/
+|   `-- shared-yaml/
+|
+|-- infrastructure/
+|   |-- kubernetes/
+|   |-- helm/
+|   |-- docker/
+|   `-- terraform/
+|
+|-- docs/
+`-- .github/
+```
 
-No session information shall be stored locally in application containers.
+Each application and service will be built and deployed independently while sharing common packages for types, events, authentication, and YAML handling.
 
-This enables:
+## Planned Frontend
 
-* Horizontal scaling
-* Rolling deployments
-* Self-healing infrastructure
-* Container replacement without data loss
+### Management Frontend
 
-## 4.2 Externalized State
+The Management Frontend is the user interface for authenticated content authors and administrators.
 
-All stateful information must be stored in dedicated infrastructure services:
+Responsibilities:
 
-| Component          | Storage                 |
-| ------------------ | ----------------------- |
-| Content            | MongoDB                 |
-| Sessions           | Redis                   |
-| Cache              | Redis                   |
-| Publication Events | RabbitMQ                |
-| Files              | Object Storage (future) |
+* Authenticate users through the platform identity flow.
+* Manage content types where permitted.
+* Create, read, update, and delete content instances.
+* Upload and manage file content metadata.
+* Request content publication and unpublication.
+* Display content lifecycle status.
+* Surface validation errors from the backend APIs.
 
----
+The frontend will communicate with backend services through the API Gateway. It will not access MongoDB, Redis, RabbitMQ, or filesystem storage directly.
 
-# 5. Content Model
+Technology:
 
-The platform uses a schema-driven content architecture.
+* Angular
+* TypeScript
+* Angular Router
+* Angular Forms
+* Angular HTTP Client
 
-## 5.1 Content Type Definitions
+The Management Frontend will follow the same architectural principles as the backend. Feature areas should be organized around business capabilities, such as content, content types, and publication.
 
-Content types are defined as YAML schemas.
+Planned feature structure:
 
-Example:
+```text
+features/content/
+|-- domain/
+|-- application/
+|-- infrastructure/
+`-- presentation/
+```
+
+Layer responsibilities:
+
+| Layer | Responsibility |
+| --- | --- |
+| Domain | Content entities, value objects, domain rules, and lifecycle constraints. |
+| Application | Use cases such as creating content, updating content, publishing content, and unpublishing content. |
+| Infrastructure | REST clients, DTO mapping, and API gateway communication. |
+| Presentation | Angular components, pages, forms, view models, and UI state. |
+
+## Planned Microservices
+
+### API Gateway
+
+Single entry point for the Management Frontend and external API clients.
+
+Responsibilities:
+
+* Routing
+* Authentication integration
+* Rate limiting
+* Request forwarding to internal services
+
+### Identity Service
+
+Handles authentication, authorization, and session management.
+
+Storage:
+
+* Redis for session data
+
+### Content Service
+
+Manages content instances.
+
+Responsibilities:
+
+* Content CRUD operations
+* Content validation
+* Content lifecycle management
+* Versioning support in future phases
+
+Storage:
+
+* MongoDB for content metadata and structured content
+* Filesystem-backed storage for binary files
+
+### Content Type Service
+
+Manages content schemas.
+
+Responsibilities:
+
+* Content type definition
+* Schema validation
+* YAML schema parsing
+
+Storage:
+
+* MongoDB
+
+### Publication Service
+
+Coordinates publication and unpublication requests created from the Management Frontend.
+
+Responsibilities:
+
+* Publication request handling
+* Unpublication request handling
+* Event generation
+* Publication state tracking
+
+Dependencies:
+
+* RabbitMQ
+* MongoDB
+
+### Publication Worker
+
+Consumes publication events and synchronizes content between Management and Delivery stages.
+
+Responsibilities:
+
+* Event consumption
+* Publish and unpublish execution
+* Delivery stage synchronization
+
+Dependencies:
+
+* RabbitMQ
+* MongoDB
+
+### Delivery Service
+
+Provides public read-only content APIs.
+
+Responsibilities:
+
+* Published content retrieval
+* Public REST endpoints
+* High-performance read operations
+
+Storage:
+
+* Delivery MongoDB or delivery-specific MongoDB collections, pending final design
+
+## Content Model
+
+ECMP uses a schema-driven content architecture. Content types are defined as YAML schemas, and content instances are validated against those schemas before being stored.
+
+Example content type definition:
 
 ```yaml
 name: generic
@@ -132,23 +284,21 @@ fields:
     type: datetime
 ```
 
-These schemas define:
+Content type schemas define:
 
 * Allowed fields
-* Data types
+* Field data types
 * Validation rules
-* Mandatory fields
-* Future extensibility
+* Required fields
+* Extensibility rules
 
----
-
-# 6. Initial Content Types
+## Initial Content Types
 
 The first platform version will support two content types.
 
-## 6.1 Generic Content
+### Generic Content
 
-Represents structured editorial content.
+Generic content represents structured editorial content.
 
 Example use cases:
 
@@ -161,21 +311,15 @@ Example:
 
 ```yaml
 id: article-001
-
 type: generic
-
 title: Welcome
-
 description: First article
-
 publishDate: 2026-06-01
 ```
 
----
+### File Content
 
-## 6.2 File Content
-
-Represents binary assets.
+File content represents binary assets. The binary file will be stored in a configured filesystem-backed storage location, while metadata will be stored in MongoDB.
 
 Example use cases:
 
@@ -184,125 +328,50 @@ Example use cases:
 * Documents
 * Videos
 
-Example:
+Example metadata:
 
 ```yaml
 id: file-001
-
 type: file
-
 filename: manual.pdf
-
 mimeType: application/pdf
-
 size: 124500
+path: /content/files/manual.pdf
 ```
 
----
+## Content Lifecycle
 
-# 7. Content Instances
+Content will move through the following lifecycle states:
 
-Content instances are stored internally as documents in MongoDB.
+| State | Description |
+| --- | --- |
+| Draft | Content is being edited. |
+| Approved | Content is ready for publication. |
+| Publishing | A publication request is being processed. |
+| Published | Content is available in the Delivery Stage. |
+| Unpublished | Content has been removed from the Delivery Stage. |
+| Archived | Content remains stored but is no longer active. |
 
-The authoritative representation remains YAML.
-
-Typical lifecycle:
-
-1. YAML definition created.
-2. Validation against schema.
-3. Conversion to internal document model.
-4. Persistence in MongoDB.
-5. Publication workflow execution.
-
----
-
-# 8. Content Lifecycle
-
-## Draft
-
-Content is being edited.
-
-## Approved
-
-Content is ready for publication.
-
-## Published
-
-Content is available in the Delivery Stage.
-
-## Unpublished
-
-Content has been removed from the Delivery Stage.
-
-## Archived
-
-Content remains stored but is no longer active.
-
----
-
-# 9. Environment Separation
-
-## Management Stage
-
-Purpose:
-
-* Content authoring
-* Editing
-* Validation
-* Approval workflows
-* Publication requests
-
-Characteristics:
-
-* Accessible only to authenticated users
-* Full CRUD capabilities
-* Stores master content
-
----
-
-## Delivery Stage
-
-Purpose:
-
-* Public content delivery
-* Read-only access
-* High performance content retrieval
-
-Characteristics:
-
-* Optimized for read operations
-* Contains only published content
-* Isolated from authoring activities
-
----
-
-# 10. Publication Workflow
+## Publication Workflow
 
 Publication must be asynchronous.
 
-## Publishing Process
+Publishing process:
 
-1. Author requests publication.
-2. Content status changes to "Publishing".
-3. Publication event is sent to RabbitMQ.
-4. Publication Worker receives the event.
-5. Content is copied to the Delivery Stage.
-6. Status changes to "Published".
+1. An author requests publication.
+2. The content status changes to `Publishing`.
+3. A publication event is sent to RabbitMQ.
+4. The Publication Worker consumes the event.
+5. The content is copied or synchronized into the Delivery Stage.
+6. The content status changes to `Published`.
 
----
+Unpublishing process:
 
-## Unpublishing Process
-
-1. Author requests unpublication.
-2. Event is sent to RabbitMQ.
-3. Publication Worker removes the content from the Delivery Stage.
-4. Status changes to "Unpublished".
-
----
-
-# 11. Messaging Architecture
-
-RabbitMQ acts as the event backbone.
+1. An author requests unpublication.
+2. An unpublication event is sent to RabbitMQ.
+3. The Publication Worker consumes the event.
+4. The content is removed from the Delivery Stage.
+5. The content status changes to `Unpublished`.
 
 Example events:
 
@@ -313,18 +382,19 @@ content.unpublish.requested
 content.unpublished
 ```
 
-Benefits:
+## Data Storage
 
-* Loose coupling
-* Resilience
-* Scalability
-* Event-driven architecture
+| Component | Storage |
+| --- | --- |
+| Structured content | MongoDB |
+| Content type schemas | MongoDB |
+| File metadata | MongoDB |
+| Binary files | Filesystem-backed storage path or mounted volume |
+| Sessions | Redis |
+| Cache | Redis |
+| Publication events | RabbitMQ |
 
----
-
-# 12. MongoDB Data Model
-
-## Content Collection
+### Content Collection
 
 ```json
 {
@@ -337,9 +407,7 @@ Benefits:
 }
 ```
 
----
-
-## Content Type Collection
+### Content Type Collection
 
 ```json
 {
@@ -350,629 +418,216 @@ Benefits:
 }
 ```
 
----
-
-# 13. Redis Usage
-
-Redis will be used for:
-
-## Session Storage
-
-User authentication sessions.
-
-## Distributed Cache
-
-Frequently requested content.
-
-## Distributed Locks
-
-Future support for concurrency control.
-
-## Rate Limiting
-
-API protection mechanisms.
-
----
-
-# 14. Planned Microservices
-
-## API Gateway
-
-Single entry point.
-
-Responsibilities:
-
-* Routing
-* Authentication
-* Rate limiting
-
----
-
-## Identity Service
-
-Responsibilities:
-
-* Authentication
-* Authorization
-* Session management
-
-Storage:
-
-* Redis
-
----
-
-## Content Service
-
-Responsibilities:
-
-* Content CRUD
-* Validation
-* Versioning
-
-Storage:
-
-* MongoDB
-
----
-
-## Content Type Service
-
-Responsibilities:
-
-* Schema management
-* Schema validation
-
-Storage:
-
-* MongoDB
-
----
-
-## Publication Service
-
-Responsibilities:
-
-* Publication requests
-* Event generation
-
-Dependencies:
-
-* RabbitMQ
-
----
-
-## Publication Worker
-
-Responsibilities:
-
-* Event consumption
-* Synchronization between stages
-
-Dependencies:
-
-* RabbitMQ
-* MongoDB
-
----
-
-## Delivery Service
-
-Responsibilities:
-
-* Public content APIs
-* Read-only content access
-
-Storage:
-
-* Delivery MongoDB
-
----
-
-# 15. Technology Stack
-
-| Layer              | Technology |
-| ------------------ | ---------- |
-| Language           | TypeScript |
-| Runtime            | Node.js    |
-| Framework          | NestJS     |
-| Database           | MongoDB    |
-| Cache              | Redis      |
-| Messaging          | RabbitMQ   |
-| Containerization   | Docker     |
-| Orchestration      | Kubernetes |
-| API                | REST       |
-| Schema Definition  | YAML       |
-| Content Definition | YAML       |
-
----
-
-# 16. Future Enhancements
-
-## Content Versioning
-
-Full revision history.
-
-## Workflow Engine
-
-Approval workflows.
-
-## Search Engine
-
-OpenSearch integration.
-
-## Asset Management
-
-Object storage integration.
-
-## GraphQL API
-
-Alternative API layer.
-
-## Multi-site Support
-
-Single platform serving multiple sites.
-
-## AI Capabilities
-
-* Content generation assistance
-* Metadata enrichment
-* Automatic tagging
-* Semantic search
-* Content recommendations
-
----
-
-# 17. Non-Functional Requirements
-
-## Scalability
-
-Horizontal scaling of all application services.
-
-## Availability
-
-No single point of failure.
-
-## Performance
-
-Low-latency content delivery.
-
-## Security
-
-Role-based access control.
-
-## Observability
-
-Centralized logging, metrics and tracing.
-
-## Cloud Native
-
-Designed for Kubernetes deployment.
-
-## Extensibility
-
-New content types can be introduced without application code changes.
-
----
-
-# 18. Cloud-Native Architecture
-
-## 18.1 Container-First Design
-
-The platform is designed from the ground up to run inside Linux containers.
-
-Every application component must be deployable as an independent container image and must not rely on host-specific configurations.
-
-Objectives:
-
-* Immutable deployments
-* Reproducible environments
-* Horizontal scalability
-* Infrastructure portability
-* Simplified operations
-
-All runtime environments shall be based on OCI-compliant Linux containers.
-
-Examples:
-
-* Docker
-* Podman
-* containerd
-
-The platform must be deployable on:
-
-* Kubernetes
-* OpenShift
-* Docker Swarm (optional)
-* Local container environments for development
-
----
-
-## 18.2 Containerization Strategy
-
-Each microservice is packaged as a separate container image.
-
-Example:
-
-```text
-content-service
-publication-service
-delivery-service
-identity-service
-publication-worker
-api-gateway
-```
-
-Container images should:
-
-* Be immutable
-* Be versioned
-* Follow semantic versioning
-* Be built through CI/CD pipelines
-
----
-
-## 18.3 Minimal Runtime Images
-
-Production images should use lightweight Linux base images.
-
-Examples:
-
-```text
-Alpine Linux
-Distroless
-Wolfi
-```
-
-Requirements:
-
-* Minimal attack surface
-* Reduced image size
-* Faster startup times
-* Improved security posture
-
----
-
-## 18.4 Stateless Containers
-
-Application containers must never store persistent state locally.
-
-The container filesystem shall be considered ephemeral.
-
-If a container is destroyed:
-
-* No content is lost
-* No session is lost
-* No publication event is lost
-
-All state is externalized to dedicated infrastructure services.
-
----
-
-# 19. Twelve-Factor Application Compliance
-
-The platform shall follow the Twelve-Factor App methodology.
-
----
-
-## Factor I - Codebase
-
-A single version-controlled codebase tracked in Git.
-
-Example:
-
-```text
-github.com/company/ecmp
-```
-
----
-
-## Factor II - Dependencies
-
-All dependencies explicitly declared.
-
-Example:
+### File Metadata
 
 ```json
 {
-  "dependencies": {
-    "@nestjs/core": "...",
-    "mongodb": "...",
-    "ioredis": "..."
-  }
+  "_id": "...",
+  "contentId": "file-001",
+  "filename": "manual.pdf",
+  "mimeType": "application/pdf",
+  "size": 124500,
+  "path": "/content/files/manual.pdf"
 }
 ```
 
-No dependency may rely on software pre-installed on the host.
+## Technology Stack
 
----
+| Layer | Technology |
+| --- | --- |
+| Frontend | Angular |
+| Language | TypeScript |
+| Runtime | Node.js |
+| Backend framework | NestJS |
+| Frontend framework | Angular |
+| Database | MongoDB |
+| Cache | Redis |
+| Messaging | RabbitMQ |
+| File storage | Filesystem |
+| Containerization | Docker |
+| Orchestration | Kubernetes |
+| API | REST |
+| Schema definition | YAML |
+| Content definition | YAML |
 
-## Factor III - Configuration
+REST will be the initial and primary API style. GraphQL may be considered later as a future enhancement.
 
-Configuration stored in environment variables.
+## Testing Strategy
 
-Examples:
+The project will follow a test-driven development approach where practical, especially for domain rules, application use cases, validation logic, and publication workflows.
 
-```text
-MONGODB_URI
-REDIS_URI
-RABBITMQ_URI
-JWT_SECRET
-```
+Planned testing tools:
 
-Configuration files must never contain environment-specific values.
+| Test type | Tooling |
+| --- | --- |
+| Frontend unit tests | Vitest and Angular testing utilities |
+| Frontend integration tests | Vitest, Angular testing utilities, and mocked HTTP clients |
+| Frontend end-to-end tests | Playwright |
+| Backend unit tests | Vitest or Jest, pending backend scaffold decision |
+| Backend integration tests | Test containers or local infrastructure dependencies, pending implementation |
+| API end-to-end tests | Playwright or dedicated HTTP-based test suites |
 
----
+Frontend test coverage should include:
 
-## Factor IV - Backing Services
+* Domain rules and value objects.
+* Application use cases.
+* DTO and API response mapping.
+* Angular components and forms.
+* Validation error handling.
+* Content CRUD flows.
+* Publish and unpublish flows.
 
-External services treated as attached resources.
+## Cloud-Native Principles
 
-Examples:
+ECMP is designed around cloud-native application principles:
 
-```text
-MongoDB
-Redis
-RabbitMQ
-Object Storage
-OpenSearch
-```
+* Services are stateless.
+* Runtime state is externalized.
+* Services are packaged as Linux containers.
+* Configuration is provided through environment variables.
+* Logs are written to stdout and stderr.
+* Services are independently deployable.
+* Scaling is performed by increasing service replicas.
+* Kubernetes is the target deployment platform.
 
-Services can be replaced through configuration only.
+## Twelve-Factor Alignment
 
----
+The platform will follow the Twelve-Factor App methodology where applicable:
 
-## Factor V - Build, Release, Run
+| Factor | ECMP Approach |
+| --- | --- |
+| Codebase | One Git repository for all services and shared packages. |
+| Dependencies | Explicit dependencies per service or package. |
+| Configuration | Environment variables for runtime configuration. |
+| Backing services | MongoDB, Redis, RabbitMQ, and filesystem-backed storage treated as attached resources. |
+| Build, release, run | CI/CD will separate build, release, and runtime concerns. |
+| Processes | Services run as stateless processes. |
+| Port binding | Services expose HTTP APIs through network ports. |
+| Concurrency | Scaling is achieved through replicas. |
+| Disposability | Services support fast startup and graceful shutdown. |
+| Dev/prod parity | Development and production should remain as similar as possible. |
+| Logs | Logs are emitted to stdout and stderr. |
+| Admin processes | Administrative tasks run as one-off processes. |
 
-Strict separation between:
-
-* Build
-* Release
-* Run
-
-Pipeline example:
-
-```text
-Source Code
-    ↓
-Build Image
-    ↓
-Release Version
-    ↓
-Deploy
-```
-
----
-
-## Factor VI - Processes
-
-Application services run as stateless processes.
-
-No local persistence.
-
-No shared memory between replicas.
-
----
-
-## Factor VII - Port Binding
-
-Services expose functionality through network ports.
-
-Example:
-
-```text
-Content Service -> :3000
-Delivery Service -> :3001
-Gateway -> :8080
-```
-
----
-
-## Factor VIII - Concurrency
-
-Scaling is achieved by adding process replicas.
-
-Example:
-
-```text
-1 Content Service Pod
-        ↓
-10 Content Service Pods
-```
-
-No application code changes required.
-
----
-
-## Factor IX - Disposability
-
-Containers must start and stop quickly.
-
-Requirements:
-
-* Fast startup
-* Graceful shutdown
-* Message acknowledgment handling
-* Connection draining
-
-Particularly important for Kubernetes rolling updates.
-
----
-
-## Factor X - Dev/Prod Parity
-
-Development and production environments should remain as similar as possible.
-
-The same Linux container image should run in:
-
-* Developer workstation
-* Test environment
-* Production environment
-
----
-
-## Factor XI - Logs
-
-Applications must write logs to stdout/stderr.
-
-Containers must not manage log files.
-
-Log aggregation handled externally.
-
-Examples:
-
-```text
-Fluent Bit
-Loki
-Elastic Stack
-OpenSearch
-```
-
----
-
-## Factor XII - Admin Processes
-
-Administrative tasks run as one-off processes.
-
-Examples:
-
-```text
-schema migration
-content import
-data repair
-bulk publication
-```
-
-These processes use the same codebase and container image.
-
----
-
-# 20. Kubernetes Deployment Model
+## Kubernetes Deployment Model
 
 The reference deployment platform is Kubernetes.
 
----
-
-## Workloads
-
-Deployment resources:
+Planned workloads:
 
 ```text
+management-frontend
 api-gateway
+identity-service
 content-service
 content-type-service
 publication-service
-delivery-service
-identity-service
-```
-
-Worker resources:
-
-```text
 publication-worker
+delivery-service
 ```
 
----
+Deployment goals:
 
-## Horizontal Pod Autoscaling
+* Multiple replicas for stateless services.
+* Horizontal Pod Autoscaling where useful.
+* Graceful shutdown for services and workers.
+* Queue-aware scaling for publication workers.
+* Health checks and readiness probes.
+* Externalized configuration through Kubernetes resources.
 
-Services should support automatic scaling.
+## Observability
 
-Metrics:
+Observability is a core requirement.
 
-* CPU
-* Memory
-* Request rate
-* Queue depth
-
-Example:
-
-```text
-minReplicas: 2
-maxReplicas: 20
-```
-
----
-
-## High Availability
-
-No service should depend on a single running instance.
-
-All application services must support multiple replicas.
-
-Example:
-
-```text
-3 API Gateway Pods
-3 Content Service Pods
-3 Delivery Service Pods
-```
-
----
-
-# 21. Observability
-
-Observability is a first-class architectural concern.
-
----
-
-## Metrics
-
-Collected through OpenTelemetry.
-
-Examples:
-
-* Request count
-* Response time
-* Publication latency
-* Queue depth
-
----
-
-## Distributed Tracing
-
-All requests must propagate trace identifiers.
-
-Example flow:
-
-```text
-Gateway
-   ↓
-Content Service
-   ↓
-Publication Service
-   ↓
-RabbitMQ
-   ↓
-Publication Worker
-```
-
----
-
-## Centralized Logging
-
-All logs aggregated from Linux containers.
-
-Requirements:
+Planned capabilities:
 
 * Structured JSON logs
 * Correlation IDs
 * Trace IDs
+* Metrics collection
+* Request latency tracking
+* Publication latency tracking
+* RabbitMQ queue depth monitoring
 
----
+OpenTelemetry is planned for metrics and distributed tracing.
 
-# 22. Architectural Differentiators
+## Non-Functional Requirements
 
-The platform differs from traditional enterprise CMS solutions through:
+| Requirement | Description |
+| --- | --- |
+| Scalability | Services must support horizontal scaling. |
+| Availability | No critical service should depend on a single running instance. |
+| Performance | Delivery APIs should provide low-latency read access. |
+| Security | Role-based access control will protect management operations and frontend access. |
+| Usability | Content authors should be able to perform CRUD and publish or unpublish operations through the frontend. |
+| Observability | Logs, metrics, and traces must support troubleshooting. |
+| Extensibility | New content types should be introduced without application code changes. |
+| Portability | The platform should run in local containers and Kubernetes environments. |
 
-* Stateless architecture
-* Linux container-first deployment model
-* Twelve-Factor compliance
-* Horizontal scalability
-* Event-driven publication
-* Schema-driven content modelling
-* YAML-based content definitions
-* Cloud-native operations
-* Kubernetes-native deployment
-* Infrastructure as Code compatibility
-* AI-assisted development through SDD
+## Roadmap
+
+### Phase 1 - Specification
+
+* Define the architecture.
+* Define the initial content model.
+* Define service responsibilities.
+* Define the publication workflow.
+* Decide the final Management and Delivery storage separation.
+
+### Phase 2 - Project Scaffold
+
+* Create the monorepo structure.
+* Scaffold the Angular Management Frontend.
+* Configure TypeScript and NestJS.
+* Add shared packages.
+* Add Docker support for local development.
+* Add basic CI checks.
+* Add the initial frontend unit test setup.
+
+### Phase 3 - Core Content Management
+
+* Implement content type schemas.
+* Implement content validation.
+* Implement content CRUD operations.
+* Connect the Management Frontend to content CRUD APIs.
+* Implement file metadata management.
+* Store binary files in the filesystem.
+* Add frontend unit and integration tests for content management.
+
+### Phase 4 - Publication Workflow
+
+* Add RabbitMQ integration.
+* Implement publication requests.
+* Implement publish and unpublish actions in the Management Frontend.
+* Implement the Publication Worker.
+* Synchronize content into the Delivery Stage.
+* Implement unpublishing.
+* Add end-to-end tests for publish and unpublish flows.
+
+### Phase 5 - Delivery and Deployment
+
+* Implement the Delivery Service.
+* Add Kubernetes manifests or Helm charts.
+* Add observability basics.
+* Document local and Kubernetes deployment.
+
+## Future Enhancements
+
+Possible future improvements include:
+
+* Full content versioning
+* Advanced approval workflows
+* OpenSearch integration
+* GraphQL API
+* Multi-site support
+* AI-assisted content metadata enrichment
+* Semantic search
+* Content recommendations
+
+## Quick Start
+
+Implementation instructions will be added once the first services are scaffolded.
+
+## License
+
+This project is released under the Apache License 2.0. See [LICENSE](LICENSE) for details.
