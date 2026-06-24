@@ -2,7 +2,7 @@
 
 This document describes the planned architecture for the Enterprise Content Management Platform (ECMP).
 
-The architecture is still evolving. Open decisions, such as the final separation between Management and Delivery storage, are documented explicitly so they can be resolved during the specification phase.
+The architecture is still evolving. Open decisions are documented explicitly so they can be resolved during the specification phase.
 
 ## System Context
 
@@ -29,7 +29,7 @@ External systems:
 
 | System | Purpose |
 | --- | --- |
-| MongoDB | Stores structured content, content schemas, publication state, and file metadata. |
+| MongoDB | Stores structured content, content schemas, publication state, published content, and file metadata. |
 | Redis | Stores sessions and cache data. |
 | RabbitMQ | Transports asynchronous publication and unpublication events. |
 | Filesystem-backed storage | Stores binary file content through a configured storage path or mounted volume. |
@@ -90,7 +90,9 @@ ECMP separates content management from content delivery. Content authors and adm
               Delivery API
 ```
 
-The exact physical separation between Management and Delivery storage is still under review. The implementation may use separate databases, separate collections, or separate MongoDB instances depending on the final design.
+Management and Delivery storage are separated at database level. The Management Stage stores authoring content in a management database, while the Delivery Stage stores published content in a delivery database.
+
+Both databases may run on the same MongoDB instance in local or simple environments. For stronger operational isolation, they may also run on separate MongoDB instances.
 
 ## Planned Monorepo Structure
 
@@ -274,7 +276,7 @@ Responsibilities:
 
 Storage:
 
-* Delivery MongoDB or delivery-specific MongoDB collections, pending final design
+* Delivery MongoDB database
 
 ## Content Model
 
@@ -400,13 +402,18 @@ content.unpublished
 
 | Component | Storage |
 | --- | --- |
-| Structured content | MongoDB |
-| Content type schemas | MongoDB |
-| File metadata | MongoDB |
-| Binary files | Filesystem-backed storage path or mounted volume |
+| Authoring structured content | Management MongoDB database |
+| Published structured content | Delivery MongoDB database |
+| Content type schemas | Management MongoDB database |
+| File metadata | Management MongoDB database |
+| File metadata | Delivery MongoDB database |
+| Binary files | Management Filesystem-backed storage path or mounted volume |
+| Binary files | Delivery Filesystem-backed storage path or mounted volume |
 | Sessions | Redis |
 | Cache | Redis |
 | Publication events | RabbitMQ |
+
+Management and Delivery data must not share the same MongoDB collections. The minimum separation is two databases in one MongoDB instance. A stronger deployment may use one MongoDB instance for Management and another MongoDB instance for Delivery.
 
 ### Content Collection
 
