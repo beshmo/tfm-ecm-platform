@@ -207,6 +207,186 @@ Ownership rules:
 * The Identity Service is the source of truth for authentication, authorization, sessions, users, and roles.
 * The Publication Worker updates Delivery storage only as part of a publication or unpublication event.
 
+### Initial REST API Contracts
+
+The initial REST API is internal to the platform and primarily consumed by the Management Frontend and internal platform clients. Endpoint paths may be exposed through the API Gateway, while service implementations remain independently deployable.
+
+All management endpoints require authentication. Authorization rules will be refined in the security model, but the initial role intent is:
+
+| Role | Initial access |
+| --- | --- |
+| Creator | Create and update draft content. |
+| Reviewer | Read and review content before publication. |
+| Publisher | Request publication and unpublication. |
+| Admin | Manage users, roles, content types, and platform access. |
+
+#### Content CRUD
+
+Owned by the Content Service.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/management/contents` | List content records from the Management database. |
+| `GET` | `/api/management/contents/{contentId}` | Retrieve a content record by ID. |
+| `POST` | `/api/management/contents` | Create a new draft content record. |
+| `PUT` | `/api/management/contents/{contentId}` | Replace an existing content record. |
+| `PATCH` | `/api/management/contents/{contentId}` | Partially update an existing content record. |
+| `DELETE` | `/api/management/contents/{contentId}` | Delete or archive a content record, depending on lifecycle rules. |
+
+Initial create/update payload shape:
+
+```json
+{
+  "contentType": "generic",
+  "data": {
+    "title": "Welcome",
+    "description": "First article",
+    "publishDate": "2026-06-01"
+  }
+}
+```
+
+#### Content Type CRUD
+
+Owned by the Content Type Service.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/management/content-types` | List content type schemas. |
+| `GET` | `/api/management/content-types/{name}` | Retrieve the latest version of a content type schema. |
+| `GET` | `/api/management/content-types/{name}/versions/{version}` | Retrieve a specific content type schema version. |
+| `POST` | `/api/management/content-types` | Create a new content type schema. |
+| `PUT` | `/api/management/content-types/{name}/versions/{version}` | Replace an existing content type schema version. |
+| `DELETE` | `/api/management/content-types/{name}/versions/{version}` | Delete or deactivate a content type schema version, depending on lifecycle rules. |
+
+Initial create/update payload shape:
+
+```json
+{
+  "name": "generic",
+  "version": "1.0",
+  "schema": {
+    "fields": {
+      "title": {
+        "type": "string",
+        "required": true
+      }
+    }
+  }
+}
+```
+
+#### File Metadata Upload and Update
+
+Owned by the Content Service.
+
+The binary file is stored in filesystem-backed storage. MongoDB stores metadata and the storage path.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/management/files` | Upload a binary file and create file metadata. |
+| `GET` | `/api/management/files/{fileId}` | Retrieve file metadata by ID. |
+| `PATCH` | `/api/management/files/{fileId}` | Update file metadata. |
+| `DELETE` | `/api/management/files/{fileId}` | Delete or archive file metadata and the associated binary file according to lifecycle rules. |
+
+Initial metadata response shape:
+
+```json
+{
+  "fileId": "file-001",
+  "filename": "manual.pdf",
+  "mimeType": "application/pdf",
+  "size": 124500,
+  "path": "/content/files/manual.pdf"
+}
+```
+
+#### Publish Request
+
+Owned by the Publication Service.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/management/contents/{contentId}/publication-requests` | Request publication for a content record. |
+| `GET` | `/api/management/publication-requests/{requestId}` | Retrieve publication request status. |
+
+Initial request payload shape:
+
+```json
+{
+  "requestedBy": "user-001",
+  "reason": "Ready for publication"
+}
+```
+
+Initial response shape:
+
+```json
+{
+  "requestId": "pub-001",
+  "contentId": "article-001",
+  "type": "publish",
+  "status": "requested"
+}
+```
+
+#### Unpublish Request
+
+Owned by the Publication Service.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/management/contents/{contentId}/unpublication-requests` | Request unpublication for a content record. |
+| `GET` | `/api/management/unpublication-requests/{requestId}` | Retrieve unpublication request status. |
+
+Initial request payload shape:
+
+```json
+{
+  "requestedBy": "user-001",
+  "reason": "Content should no longer be available"
+}
+```
+
+Initial response shape:
+
+```json
+{
+  "requestId": "unpub-001",
+  "contentId": "article-001",
+  "type": "unpublish",
+  "status": "requested"
+}
+```
+
+#### Delivery Content Retrieval
+
+Owned by the Delivery Service.
+
+Delivery endpoints are internal read-only APIs backed by the Delivery MongoDB database.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/delivery/contents` | List published content records from the Delivery database. |
+| `GET` | `/api/delivery/contents/{contentId}` | Retrieve a published content record by ID. |
+| `GET` | `/api/delivery/contents?contentType={contentType}` | List published content records by content type. |
+
+Initial response shape:
+
+```json
+{
+  "contentId": "article-001",
+  "contentType": "generic",
+  "version": 1,
+  "publishedAt": "2026-06-01T10:00:00.000Z",
+  "data": {
+    "title": "Welcome",
+    "description": "First article",
+    "publishDate": "2026-06-01"
+  }
+}
+```
+
 ### API Gateway
 
 Single entry point for the Management Frontend and internal platform API clients.
