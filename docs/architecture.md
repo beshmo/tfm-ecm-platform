@@ -44,50 +44,33 @@ Out of scope for the current architecture:
 
 ECMP separates content management from content delivery. Content authors and admins use a Management Frontend over HTTPS to create, edit, approve, publish, and unpublish content in the Management Stage. Internal clients read published content from the Delivery Stage through internal APIs. Publication between both stages is asynchronous and event-driven.
 
-```text
-+--------------------------------------------------+
-|                 Management Stage                 |
-+--------------------------------------------------+
+```mermaid
+flowchart TD
+  subgraph management["Management Stage"]
+    frontend["Management Frontend"]
+    gateway["API Gateway"]
+    managementApi["Management API"]
+    managementDb[("Management MongoDB<br/>Authoring Content")]
+    publishRequest["Publish Request"]
+    rabbitmq["RabbitMQ"]
 
-        +-----------------------+
-        | Management Frontend   |
-        +-----------+-----------+
-                    |
-                    v
-        +-----------------------+
-        | API Gateway           |
-        +-----------+-----------+
-                    |
-                    v
-        +-----------------------+
-        | Management API        |
-        +-----------+-----------+
-                    |
-                    v
-              MongoDB
-        (Authoring Content)
-                    |
-                    v
-             Publish Request
-                    |
-                    v
-              RabbitMQ
-                    |
-                    v
-+--------------------------------------------------+
-|                  Delivery Stage                  |
-+--------------------------------------------------+
+    frontend --> gateway
+    gateway --> managementApi
+    managementApi --> managementDb
+    managementDb --> publishRequest
+    publishRequest --> rabbitmq
+  end
 
-        +-----------------------+
-        | Publication Worker    |
-        +-----------+-----------+
-                    |
-                    v
-              MongoDB
-        (Published Content)
-                    |
-                    v
-              Delivery API
+  subgraph delivery["Delivery Stage"]
+    worker["Publication Worker"]
+    deliveryDb[("Delivery MongoDB<br/>Published Content")]
+    deliveryApi["Delivery API"]
+
+    worker --> deliveryDb
+    deliveryDb --> deliveryApi
+  end
+
+  rabbitmq --> worker
 ```
 
 Management and Delivery storage are separated at database level. The Management Stage stores authoring content in a management database, while the Delivery Stage stores published content in a delivery database.
