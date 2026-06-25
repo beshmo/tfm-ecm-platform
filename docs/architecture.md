@@ -184,6 +184,29 @@ Layer responsibilities:
 
 ## Planned Microservices
 
+### Service Boundaries
+
+Each service owns a specific part of the domain model and should expose that ownership through its API. Other services may read or request changes through published APIs or events, but they should not directly modify another service's owned data.
+
+| Service | Owns |
+| --- | --- |
+| Identity Service | Authentication, authorization, sessions, users, and role assignments. |
+| Content Type Service | Content type schemas and schema validation rules. |
+| Content Service | Content drafts, master records, content lifecycle state, and file metadata. |
+| Publication Service | Publication and unpublication requests, publication state, and publication events. |
+| Publication Worker | Execution of publication and unpublication events between Management and Delivery stages. |
+| Delivery Service | Published read model access and internal delivery queries. |
+| API Gateway | Request routing, edge authentication integration, and cross-cutting API concerns. |
+
+Ownership rules:
+
+* The Content Service is the source of truth for draft and master content records.
+* The Content Type Service is the source of truth for schemas.
+* The Publication Service is the source of truth for publication requests.
+* The Delivery Service exposes published read models but does not own authoring content.
+* The Identity Service is the source of truth for authentication, authorization, sessions, users, and roles.
+* The Publication Worker updates Delivery storage only as part of a publication or unpublication event.
+
 ### API Gateway
 
 Single entry point for the Management Frontend and internal platform API clients.
@@ -199,6 +222,14 @@ Responsibilities:
 
 Handles authentication, authorization, and session management.
 
+Ownership:
+
+* Users
+* Roles
+* Authentication
+* Authorization
+* Sessions
+
 Storage:
 
 * Redis for session data
@@ -206,6 +237,13 @@ Storage:
 ### Content Service
 
 Manages content instances.
+
+Ownership:
+
+* Content drafts
+* Master content records
+* Content lifecycle state
+* File metadata
 
 Responsibilities:
 
@@ -223,6 +261,11 @@ Storage:
 
 Manages content schemas.
 
+Ownership:
+
+* Content type schemas
+* Schema validation rules
+
 Responsibilities:
 
 * Content type definition
@@ -236,6 +279,13 @@ Storage:
 ### Publication Service
 
 Coordinates publication and unpublication requests created from the Management Frontend.
+
+Ownership:
+
+* Publication requests
+* Unpublication requests
+* Publication state
+* Publication events
 
 Responsibilities:
 
@@ -267,6 +317,11 @@ Dependencies:
 ### Delivery Service
 
 Provides internal read-only content APIs.
+
+Ownership:
+
+* Published read model access
+* Internal delivery queries
 
 Responsibilities:
 
