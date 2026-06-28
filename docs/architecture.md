@@ -1628,9 +1628,30 @@ Management and Delivery data must not share the same MongoDB collections. The mi
 
 REST will be the initial and primary API style. GraphQL may be considered later as a future enhancement.
 
-## Testing Strategy
+## Testing Architecture
 
 The project will follow a test-driven development approach where practical, especially for domain rules, application use cases, validation logic, and publication workflows.
+
+Testing expectations are defined by layer. Percentages are minimum expected coverage targets for the first implementation and should be enforced in CI once the corresponding code exists.
+
+Minimum expected tests per layer:
+
+| Layer | Minimum target | Scope |
+| --- | --- | --- |
+| Domain unit tests | 100% | Entities, value objects, validation rules, content lifecycle rules, folder rules, ID rules, and publication domain rules. |
+| Application use case tests | 100% | Use cases such as creating folders, updating content instances, deleting records, uploading file metadata, publishing, unpublishing, login, and token refresh. |
+| Service integration tests | 30% | Service behavior with real or test infrastructure dependencies such as MongoDB, Redis, RabbitMQ, and filesystem-backed storage. |
+| API contract tests | 100% | REST request and response contracts, status codes, authentication requirements, authorization requirements, and error shapes. |
+| Angular component/integration tests | 20% | Components, forms, route guards, frontend use case integration, API client mapping, and folder explorer interactions. |
+| Playwright E2E workflows | 10% | Critical browser workflows across the Management Frontend and APIs. |
+
+Coverage rules:
+
+* Domain and application layers must be fully covered because they contain business rules and use cases.
+* API contract tests must cover every documented endpoint before the endpoint is considered complete.
+* Integration, Angular, and E2E targets start lower because they are more expensive to maintain and should focus on the highest-risk behavior first.
+* Coverage targets should increase later as the platform stabilizes.
+* A feature should not be considered complete if its domain rules, use cases, or API contracts are missing tests.
 
 Planned testing tools:
 
@@ -1652,6 +1673,15 @@ Frontend test coverage should include:
 * Validation error handling.
 * Content CRUD flows.
 * Publish and unpublish flows.
+
+Initial Playwright E2E workflows should include:
+
+* Login and redirect to the folder explorer.
+* Create, update, and delete a folder.
+* Create, update, and delete a content instance.
+* Upload static file metadata.
+* Publish a content instance.
+* Unpublish a content instance.
 
 ## Cloud-Native Principles
 
