@@ -263,6 +263,223 @@ Initial user workflows:
 
 The first implementation should avoid deep navigation. Content editing, folder editing, and publication actions can be handled inside the folder explorer through panels, dialogs, or inline forms as long as the feature boundaries remain separated in the Angular code.
 
+## Security Model
+
+The initial security model is role-based and permission-driven. It starts with a small set of roles and resource actions that are enough for the Management Frontend, folder explorer, content CRUD, static file management, and publication workflow.
+
+### Roles
+
+Initial roles:
+
+| Role | Description |
+| --- | --- |
+| Admin | Administrative user with full platform access. |
+| Creator | Content author who can create and maintain folders, files, and content instances. |
+| Reviewer | Content author who can read folders, files, and content instances before publication. |
+| Publisher | Content author who can read content and request publication or unpublication. |
+
+### Permissions
+
+Permissions use a `resource:action` format.
+
+Initial resources:
+
+| Resource | Description |
+| --- | --- |
+| `explorer` | Management Frontend folder explorer workspace access. |
+| `folder` | Folder hierarchy operations. |
+| `file` | Static file metadata and binary file operations. |
+| `<contentTypeName>` | Content instance operations for a specific user-defined content type, such as `generic:read`. |
+| `workflow` | Publication and unpublication workflow operations. |
+| `content-type` | Content type schema administration. |
+
+Initial actions:
+
+| Action | Description |
+| --- | --- |
+| `read` | View or retrieve a resource. |
+| `create` | Create a new resource. |
+| `update` | Modify an existing resource. |
+| `delete` | Delete or archive a resource according to lifecycle rules. |
+| `*` | All actions for the resource. |
+
+### Role-Permission Mapping
+
+| Role | Permissions |
+| --- | --- |
+| Admin | All permissions. |
+| Creator | `explorer:read`, `folder:*`, `file:*`, `<contentTypeName>:*` |
+| Reviewer | `explorer:read`, `folder:read`, `file:read`, `<contentTypeName>:read` |
+| Publisher | `explorer:read`, `folder:read`, `file:read`, `<contentTypeName>:read`, `workflow:*` |
+
+The earlier `projects` permission name is represented as `folder` in ECMP because folders are the platform resource used to group content instances.
+
+### Authentication Flow
+
+The first implementation will support username and password authentication only.
+
+Initial JWT-based flow:
+
+1. The user opens the Management Frontend.
+2. If there is no valid session or token, the frontend redirects to `/login`.
+3. The user submits username or email and password.
+4. The Management Frontend sends the credentials to the login endpoint.
+5. The Identity Service validates credentials against the identity store.
+6. If credentials are valid, the server issues an access token and a refresh token.
+7. The client stores the tokens according to the token transport strategy.
+8. The frontend redirects the user to the folder explorer.
+9. The client includes the access token in subsequent API requests.
+10. Authorization middleware validates the access token before protected endpoints are executed.
+11. When the access token expires, the client exchanges the refresh token for a new access token.
+12. Logout or refresh token expiration ends the authenticated session.
+13. If authentication fails, the login screen shows an error without starting a session.
+
+Flow diagram:
+
+```text
+Client
+  |
+  | POST /api/auth/login
+  v
+Identity Service
+  |
+  | Validate credentials
+  v
+Identity Store
+  |
+  | Credentials valid
+  v
+Generate tokens
+  |-- Access token
+  `-- Refresh token
+  |
+  v
+Client stores tokens
+  |
+  | Requests API with access token
+  v
+Authorization middleware
+  |
+  | Validate access token
+  v
+Protected endpoint
+```
+
+### Session and Token Strategy
+
+The initial implementation should use stateless access tokens and stateful refresh tokens.
+
+Initial strategy:
+
+* The Identity Service authenticates username and password credentials.
+* A short-lived signed JWT access token is issued after successful login.
+* A longer-lived refresh token is issued after successful login.
+* Access tokens are stateless and are not stored server-side.
+* Refresh tokens are stored server-side so they can be rotated and revoked.
+* Refresh tokens should be rotated after every successful refresh.
+* Logout invalidates active refresh tokens.
+* Inactive sessions expire automatically when their refresh tokens expire.
+* The Management Frontend sends the access token with API requests using the `Authorization: Bearer <token>` header.
+* The API Gateway or authorization middleware validates the access token on every protected request.
+* Backend services should receive trusted identity and permission context from the API Gateway or validate the token according to the final implementation approach.
+* HTTPS is required for all authenticated traffic.
+
+Access token characteristics:
+
+| Property | Initial decision |
+| --- | --- |
+| Purpose | Authenticate API requests. |
+| Format | Signed JWT. |
+| Lifetime | Short-lived, initially 5 to 30 minutes. |
+| Transport | `Authorization: Bearer <token>`. |
+| Server-side storage | None. |
+
+Example access token claims:
+
+```json
+{
+  "sub": "USR-12345",
+  "email": "user@example.com",
+  "roles": ["Creator"],
+  "permissions": [
+    "explorer:read",
+    "folder:*",
+    "file:*",
+    "generic:*"
+  ],
+  "iat": 1712340000,
+  "exp": 1712341800
+}
+```
+
+Refresh token characteristics:
+
+| Property | Initial decision |
+| --- | --- |
+| Purpose | Obtain new access tokens. |
+| Format | Opaque token or signed token, pending implementation. |
+| Lifetime | Longer-lived, initially 7 to 30 days. |
+| Browser storage | Prefer HttpOnly, Secure, SameSite cookie. |
+| Server-side storage | Required for rotation and revocation. |
+| Rotation | Rotate after every successful use. |
+
+Refresh token storage may use Redis in the first implementation because Redis is already planned for session-related data.
+
+Token transport can be refined during implementation. The preferred default is an HTTP-only secure cookie for refresh tokens and an `Authorization: Bearer` header for access tokens.
+
+### Authorization Behavior
+
+Every protected endpoint must validate authentication and authorization before executing business logic.
+
+Authorization flow:
+
+1. The request reaches the API Gateway or service authorization middleware.
+2. The middleware validates the access token signature and expiration.
+3. The middleware extracts user identity, roles, and permissions from token claims.
+4. The middleware compares endpoint requirements with the user's permissions.
+5. If the token is missing, expired, or invalid, the platform returns `401 Unauthorized`.
+6. If the user is authenticated but lacks the required permission, the platform returns `403 Forbidden`.
+7. If the permission check passes, the protected endpoint executes.
+
+Example:
+
+```text
+GET /api/management/folders/FLD-root
+
+Requires:
+  folder:read
+
+Validate JWT
+Extract permissions
+folder:read exists?
+  Yes -> 200 OK
+  No  -> 403 Forbidden
+```
+
+Frontend route authorization:
+
+| Route | Required permission |
+| --- | --- |
+| `/login` | Public |
+| `/folders` | `explorer:read` |
+| `/folders/:folderId` | `explorer:read` and `folder:read` |
+
+### Security Best Practices
+
+Initial best practices:
+
+* Use Role-Based Access Control to simplify permission management.
+* Enforce least privilege by granting users only the permissions they need.
+* Validate authorization on every protected endpoint.
+* Keep access tokens short-lived.
+* Keep refresh tokens longer-lived but rotate them after every use.
+* Store refresh tokens in secure HttpOnly cookies when possible.
+* Support refresh token revocation for logout, compromised accounts, and administrative actions.
+* Use HTTPS for all authenticated traffic.
+* Return `401 Unauthorized` for missing, expired, or invalid authentication.
+* Return `403 Forbidden` for authenticated users lacking the required permission.
+* Audit security-sensitive operations such as login attempts, token refreshes, logout, permission changes, role changes, and administrative actions.
+
 ## Planned Microservices
 
 ### Service Boundaries
@@ -293,28 +510,49 @@ Ownership rules:
 
 The initial REST API is internal to the platform and primarily consumed by the Management Frontend and internal platform clients. Endpoint paths may be exposed through the API Gateway, while service implementations remain independently deployable.
 
-All management endpoints require authentication. Authorization rules will be refined in the security model, but the initial role intent is:
+All management endpoints require authentication. Endpoint authorization uses the permissions defined in the Security Model.
 
-| Role | Initial access |
-| --- | --- |
-| Creator | Create and update draft content. |
-| Reviewer | Read and review content before publication. |
-| Publisher | Request publication and unpublication. |
-| Admin | Manage users, roles, content types, and platform access. |
+#### Authentication
+
+Owned by the Identity Service.
+
+| Method | Endpoint | Permission | Description |
+| --- | --- | --- | --- |
+| `POST` | `/api/auth/login` | Anonymous access | Authenticate with username and password and start a session. |
+| `POST` | `/api/auth/refresh` | Valid refresh token | Exchange a valid refresh token for a new access token and rotated refresh token. |
+| `POST` | `/api/auth/logout` | Authenticated session | End the current session. |
+| `GET` | `/api/auth/session` | Authenticated session | Retrieve the current authenticated user, roles, and permissions. |
+
+Initial login payload shape:
+
+```json
+{
+  "username": "creator@example.com",
+  "password": "password"
+}
+```
+
+Initial refresh behavior:
+
+* The client calls `/api/auth/refresh` when the access token expires or is close to expiring.
+* The request must include a valid refresh token.
+* The Identity Service validates the refresh token against server-side storage.
+* If valid, the Identity Service issues a new access token and rotates the refresh token.
+* If invalid, expired, revoked, or reused after rotation, the request fails with `401 Unauthorized`.
 
 #### Content CRUD
 
 Owned by the Content Service.
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `GET` | `/api/management/contents` | List content records from the Management database. |
-| `GET` | `/api/management/contents?folderId={folderId}` | List content records assigned to a folder. |
-| `GET` | `/api/management/contents/{contentId}` | Retrieve a content record by ID. |
-| `POST` | `/api/management/contents` | Create a new draft content record. |
-| `PUT` | `/api/management/contents/{contentId}` | Replace an existing content record. |
-| `PATCH` | `/api/management/contents/{contentId}` | Partially update an existing content record. |
-| `DELETE` | `/api/management/contents/{contentId}` | Delete or archive a content record, depending on lifecycle rules. |
+| Method | Endpoint | Permission | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/management/contents` | `<contentTypeName>:read` | List content records from the Management database. |
+| `GET` | `/api/management/contents?folderId={folderId}` | `folder:read` and `<contentTypeName>:read` | List content records assigned to a folder. |
+| `GET` | `/api/management/contents/{contentId}` | `<contentTypeName>:read` | Retrieve a content record by ID. |
+| `POST` | `/api/management/contents` | `<contentTypeName>:create` | Create a new draft content record. |
+| `PUT` | `/api/management/contents/{contentId}` | `<contentTypeName>:update` | Replace an existing content record. |
+| `PATCH` | `/api/management/contents/{contentId}` | `<contentTypeName>:update` | Partially update an existing content record. |
+| `DELETE` | `/api/management/contents/{contentId}` | `<contentTypeName>:delete` | Delete or archive a content record, depending on lifecycle rules. |
 
 Initial create/update payload shape:
 
@@ -336,14 +574,14 @@ Owned by the Content Service.
 
 Folders organize content instances into a hierarchical tree. Folder operations are internal management operations used by the Management Frontend.
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `GET` | `/api/management/folders` | List folders, optionally filtered by parent folder. |
-| `GET` | `/api/management/folders/{folderId}` | Retrieve a folder by ID. |
-| `POST` | `/api/management/folders` | Create a new folder under an existing parent folder. |
-| `PATCH` | `/api/management/folders/{folderId}` | Update folder metadata, such as the folder name. |
-| `DELETE` | `/api/management/folders/{folderId}` | Delete or archive a folder according to folder and content lifecycle rules. |
-| `GET` | `/api/management/folders/{folderId}/contents` | List content records assigned to a folder. |
+| Method | Endpoint | Permission | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/management/folders` | `folder:read` | List folders, optionally filtered by parent folder. |
+| `GET` | `/api/management/folders/{folderId}` | `folder:read` | Retrieve a folder by ID. |
+| `POST` | `/api/management/folders` | `folder:create` | Create a new folder under an existing parent folder. |
+| `PATCH` | `/api/management/folders/{folderId}` | `folder:update` | Update folder metadata, such as the folder name. |
+| `DELETE` | `/api/management/folders/{folderId}` | `folder:delete` | Delete or archive a folder according to folder and content lifecycle rules. |
+| `GET` | `/api/management/folders/{folderId}/contents` | `folder:read` and `<contentTypeName>:read` | List content records assigned to a folder. |
 
 Initial create/update payload shape:
 
@@ -371,14 +609,14 @@ Initial response shape:
 
 Owned by the Content Type Service.
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `GET` | `/api/management/content-types` | List content type schemas. |
-| `GET` | `/api/management/content-types/{name}` | Retrieve the latest version of a content type schema. |
-| `GET` | `/api/management/content-types/{name}/versions/{version}` | Retrieve a specific content type schema version. |
-| `POST` | `/api/management/content-types` | Create a new content type schema. |
-| `PUT` | `/api/management/content-types/{name}/versions/{version}` | Replace an existing content type schema version. |
-| `DELETE` | `/api/management/content-types/{name}/versions/{version}` | Delete or deactivate a content type schema version, depending on lifecycle rules. |
+| Method | Endpoint | Permission | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/management/content-types` | `content-type:read` | List content type schemas. |
+| `GET` | `/api/management/content-types/{name}` | `content-type:read` | Retrieve the latest version of a content type schema. |
+| `GET` | `/api/management/content-types/{name}/versions/{version}` | `content-type:read` | Retrieve a specific content type schema version. |
+| `POST` | `/api/management/content-types` | `content-type:create` | Create a new content type schema. |
+| `PUT` | `/api/management/content-types/{name}/versions/{version}` | `content-type:update` | Replace an existing content type schema version. |
+| `DELETE` | `/api/management/content-types/{name}/versions/{version}` | `content-type:delete` | Delete or deactivate a content type schema version, depending on lifecycle rules. |
 
 Initial create/update payload shape:
 
@@ -403,12 +641,12 @@ Owned by the Content Service.
 
 The binary file is stored in filesystem-backed storage. MongoDB stores metadata and the storage path.
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `POST` | `/api/management/files` | Upload a binary file and create file metadata. |
-| `GET` | `/api/management/files/{fileId}` | Retrieve file metadata by ID. |
-| `PATCH` | `/api/management/files/{fileId}` | Update file metadata. |
-| `DELETE` | `/api/management/files/{fileId}` | Delete or archive file metadata and the associated binary file according to lifecycle rules. |
+| Method | Endpoint | Permission | Description |
+| --- | --- | --- | --- |
+| `POST` | `/api/management/files` | `file:create` | Upload a binary file and create file metadata. |
+| `GET` | `/api/management/files/{fileId}` | `file:read` | Retrieve file metadata by ID. |
+| `PATCH` | `/api/management/files/{fileId}` | `file:update` | Update file metadata. |
+| `DELETE` | `/api/management/files/{fileId}` | `file:delete` | Delete or archive file metadata and the associated binary file according to lifecycle rules. |
 
 Initial metadata response shape:
 
@@ -427,10 +665,10 @@ Initial metadata response shape:
 
 Owned by the Publication Service.
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `POST` | `/api/management/contents/{contentId}/publication-requests` | Request publication for a content record. |
-| `GET` | `/api/management/publication-requests/{requestId}` | Retrieve publication request status. |
+| Method | Endpoint | Permission | Description |
+| --- | --- | --- | --- |
+| `POST` | `/api/management/contents/{contentId}/publication-requests` | `workflow:create` and `<contentTypeName>:read` | Request publication for a content record. |
+| `GET` | `/api/management/publication-requests/{requestId}` | `workflow:read` | Retrieve publication request status. |
 
 Initial request payload shape:
 
@@ -456,10 +694,10 @@ Initial response shape:
 
 Owned by the Publication Service.
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `POST` | `/api/management/contents/{contentId}/unpublication-requests` | Request unpublication for a content record. |
-| `GET` | `/api/management/unpublication-requests/{requestId}` | Retrieve unpublication request status. |
+| Method | Endpoint | Permission | Description |
+| --- | --- | --- | --- |
+| `POST` | `/api/management/contents/{contentId}/unpublication-requests` | `workflow:create` and `<contentTypeName>:read` | Request unpublication for a content record. |
+| `GET` | `/api/management/unpublication-requests/{requestId}` | `workflow:read` | Retrieve unpublication request status. |
 
 Initial request payload shape:
 
@@ -487,12 +725,12 @@ Owned by the Delivery Service.
 
 Delivery endpoints are internal read-only APIs backed by the Delivery MongoDB database.
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `GET` | `/api/delivery/contents` | List published content records from the Delivery database. |
-| `GET` | `/api/delivery/contents/{contentId}` | Retrieve a published content record by ID. |
-| `GET` | `/api/delivery/contents?contentType={contentType}` | List published content records by content type. |
-| `GET` | `/api/delivery/contents?folderId={folderId}` | List published content records by folder. |
+| Method | Endpoint | Permission | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/delivery/contents` | Internal client access and `<contentTypeName>:read` | List published content records from the Delivery database. |
+| `GET` | `/api/delivery/contents/{contentId}` | Internal client access and `<contentTypeName>:read` | Retrieve a published content record by ID. |
+| `GET` | `/api/delivery/contents?contentType={contentType}` | Internal client access and `<contentTypeName>:read` | List published content records by content type. |
+| `GET` | `/api/delivery/contents?folderId={folderId}` | Internal client access, `folder:read`, and `<contentTypeName>:read` | List published content records by folder. |
 
 Initial response shape:
 
