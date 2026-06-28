@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ContentId, Permission } from "./index";
+import type { ContentId, ContentTypeSchemaDefinition, Permission } from "./index";
 
 describe("shared types", () => {
   it("supports prefixed content IDs and resource permissions", () => {
@@ -9,5 +9,21 @@ describe("shared types", () => {
 
     expect(contentId).toBe("RCD-123");
     expect(permission).toBe("folder:read");
+  });
+
+  it("GIVEN a normalized content type schema WHEN fields are defined THEN simple field types are supported", () => {
+    const schema: ContentTypeSchemaDefinition = {
+      name: "generic",
+      version: "1.0",
+      fields: {
+        title: { type: "string", required: true },
+        priority: { type: "integer", required: false },
+        publishDate: { type: "date", required: false },
+        publishTime: { type: "time", required: false }
+      }
+    };
+
+    expect(schema.fields["title"]?.required).toBe(true);
+    expect(schema.fields["priority"]?.type).toBe("integer");
   });
 });

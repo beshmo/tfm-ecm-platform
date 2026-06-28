@@ -22,3 +22,24 @@ export interface HealthResponse {
   service: string;
   status: "ok";
 }
+
+export type ContentTypeName = string;
+export type ContentTypeVersion = string;
+export type ContentFieldType = "string" | "integer" | "date" | "time";
+
+export interface ContentTypeFieldDefinition {
+  type: ContentFieldType;
+  required: boolean;
+}
+
+export interface ContentTypeSchemaDefinition {
+  name: ContentTypeName;
+  version: ContentTypeVersion;
+  fields: Record<string, ContentTypeFieldDefinition>;
+}
+
+export interface ContentTypeSchemaSummary {
+  name: ContentTypeName;
+  version: ContentTypeVersion;
+  active: boolean;
+}

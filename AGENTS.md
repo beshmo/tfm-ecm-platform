@@ -35,11 +35,15 @@ docker compose up --build # Start the local stack
 
 Use TypeScript for Angular, NestJS, and shared packages. Prefer strict typing, small domain-focused modules, and clean architecture boundaries: `domain`, `application`, `infrastructure`, and `presentation` where useful. Use kebab-case for directories and files, PascalCase for classes/components, camelCase for variables/functions, and UPPER_SNAKE_CASE for constants.
 
+Keep domain code independent from frameworks and infrastructure. Application use cases should depend on interfaces/ports. Infrastructure implements those ports, and presentation adapts HTTP or UI input to application calls.
+
 Documentation should be concise, structured with Markdown headings, and written in clear technical English.
 
 ## Testing Guidelines
 
 The target testing strategy is documented in `docs/architecture.md`. Minimum goals are 100% coverage for domain unit tests, application use case tests, and API contract tests; 30% for service integration tests; 20% for Angular component/integration tests; and 10% for Playwright E2E workflows. Name tests after the behavior under test, for example `create-folder.use-case.spec.ts`.
+
+Use TDD for new domain rules, application use cases, and validation behavior. Prefer BDD-style test names using GIVEN-WHEN-THEN when describing user-visible or business behavior.
 
 ## Commit & Pull Request Guidelines
 
@@ -50,3 +54,5 @@ Pull requests should include a short summary, affected areas, verification perfo
 ## Security & Configuration Tips
 
 Do not commit secrets, tokens, credentials, or production configuration. Keep local examples clearly non-production and document new runtime variables in the relevant README or architecture section.
+
+Apply OWASP Top 10 practices by default: validate external input, use allowlists, enforce authorization, avoid unsafe deserialization or dynamic execution, limit payload sizes, sanitize errors, and keep dependency updates visible through the lockfile.

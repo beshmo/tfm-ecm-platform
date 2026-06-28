@@ -10,11 +10,14 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit",
+    "pretest": "pnpm --filter @ecmp/shared-types --filter @ecmp/shared-yaml build",
     "test": "vitest run",
+    "pretest:unit": "pnpm --filter @ecmp/shared-types --filter @ecmp/shared-yaml build",
     "test:unit": "vitest run"
   },
   "dependencies": {
     "@ecmp/shared-types": "workspace:*",
+    "@ecmp/shared-yaml": "workspace:*",
     "@nestjs/common": "^11.1.0",
     "@nestjs/core": "^11.1.0",
     "@nestjs/platform-express": "^11.1.0",

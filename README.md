@@ -109,6 +109,15 @@ These tools should be installed as repository dependencies during Phase 2 instea
 
 MongoDB, Redis, and RabbitMQ do not need to be installed directly on the host machine for local development. They should run through Docker Compose.
 
+## Implementation Guidelines
+
+Implementation work should follow the engineering standards defined in [Architecture](docs/architecture.md):
+
+* Use Clean Architecture boundaries: `domain`, `application`, `infrastructure`, and `presentation`.
+* Practice TDD for domain rules, application use cases, validation logic, and API contracts.
+* Use BDD-style test names with GIVEN-WHEN-THEN wording for behavior-focused tests.
+* Apply OWASP Top 10 practices when handling external input, authentication, authorization, errors, dependencies, and sensitive data.
+
 ## Repository Structure
 
 ```text

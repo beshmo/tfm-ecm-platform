@@ -1630,6 +1630,72 @@ Management and Delivery data must not share the same MongoDB collections. The mi
 
 REST will be the initial and primary API style. GraphQL may be considered later as a future enhancement.
 
+## Implementation Guidelines
+
+All implementation work should follow the same engineering practices across frontend, backend services, and shared packages.
+
+### Clean Architecture
+
+Business capabilities should be organized around explicit boundaries:
+
+| Layer | Responsibility |
+| --- | --- |
+| Domain | Entities, value objects, invariants, validation rules, and business errors. |
+| Application | Use cases, orchestration, ports, and transaction boundaries. |
+| Infrastructure | Database repositories, message brokers, filesystem access, external clients, and framework adapters. |
+| Presentation | REST controllers, Angular components, DTOs, request/response mapping, and UI state. |
+
+Initial rules:
+
+* Domain code must not depend on NestJS, Angular, MongoDB, RabbitMQ, filesystem APIs, or HTTP concerns.
+* Application use cases should depend on interfaces/ports instead of concrete infrastructure.
+* Infrastructure should implement application or domain ports.
+* Presentation should translate transport-specific input/output into application calls.
+* Shared packages should expose stable types and utilities, not service-specific business flows.
+
+### Test-Driven Development
+
+New behavior should be developed test-first where practical.
+
+TDD expectations:
+
+* Write focused failing tests before implementing domain rules and application use cases.
+* Keep domain and application tests fast and independent from infrastructure.
+* Add integration tests when persistence, messaging, filesystem, or HTTP boundaries are introduced.
+* Do not consider a feature complete if its domain rules, use cases, and API contracts are untested.
+
+### BDD Test Style
+
+Behavior tests should use clear GIVEN-WHEN-THEN wording in test names when it improves readability.
+
+Example:
+
+```text
+GIVEN a valid YAML schema WHEN it is parsed THEN it returns a normalized schema
+```
+
+Guidelines:
+
+* Use behavior-focused names instead of implementation-focused names.
+* Prefer observable outcomes over internal implementation details.
+* Keep one main behavior per test.
+* Cover success, validation failure, authorization failure, and important edge cases.
+
+### OWASP Top 10 Alignment
+
+Security-sensitive implementation work should consider the OWASP Top 10 by default.
+
+Initial rules:
+
+* Validate and normalize all external input at system boundaries.
+* Use allowlists for accepted enum values, schema keys, resource names, and actions.
+* Enforce authentication and authorization before protected use cases execute.
+* Avoid leaking stack traces, filesystem paths, secrets, tokens, or implementation details in API errors.
+* Avoid unsafe dynamic execution, prototype pollution, deserialization surprises, and implicit type coercion.
+* Apply size limits to request bodies, uploaded files, YAML schemas, and message payloads.
+* Log security-relevant events without logging secrets or sensitive personal data.
+* Keep dependencies pinned through the workspace lockfile and review security updates regularly.
+
 ## Testing Architecture
 
 The project will follow a test-driven development approach where practical, especially for domain rules, application use cases, validation logic, and publication workflows.

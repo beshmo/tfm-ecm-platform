@@ -11,5 +11,9 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@ecmp/shared-types": "workspace:*",
+    "yaml": "^2.8.1"
   }
 }
