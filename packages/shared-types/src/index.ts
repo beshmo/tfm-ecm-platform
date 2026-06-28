@@ -43,3 +43,32 @@ export interface ContentTypeSchemaSummary {
   version: ContentTypeVersion;
   active: boolean;
 }
+
+export type ContentInstanceData = Record<string, unknown>;
+
+export type ContentValidationErrorCode =
+  | "INVALID_CONTENT_DATA"
+  | "REQUIRED_FIELD_MISSING"
+  | "UNKNOWN_FIELD"
+  | "FORBIDDEN_FIELD_NAME"
+  | "INVALID_STRING"
+  | "INVALID_INTEGER"
+  | "INVALID_DATE"
+  | "INVALID_TIME";
+
+export interface ContentValidationError {
+  field: string;
+  code: ContentValidationErrorCode;
+  message: string;
+}
+
+export interface ContentValidationResult {
+  valid: boolean;
+  errors: ContentValidationError[];
+}
+
+export interface ContentInstanceValidationInput {
+  contentType: ContentTypeName;
+  schemaVersion?: ContentTypeVersion;
+  data: unknown;
+}

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { ContentId, ContentTypeSchemaDefinition, Permission } from "./index";
+import type {
+  ContentId,
+  ContentInstanceValidationInput,
+  ContentTypeSchemaDefinition,
+  ContentValidationResult,
+  Permission
+} from "./index";
 
 describe("shared types", () => {
   it("supports prefixed content IDs and resource permissions", () => {
@@ -25,5 +31,25 @@ describe("shared types", () => {
 
     expect(schema.fields["title"]?.required).toBe(true);
     expect(schema.fields["priority"]?.type).toBe("integer");
+  });
+
+  it("GIVEN a content validation result WHEN validation fails THEN structured errors describe invalid fields", () => {
+    const input: ContentInstanceValidationInput = {
+      contentType: "article",
+      data: { publishDate: "tomorrow" }
+    };
+    const result: ContentValidationResult = {
+      valid: false,
+      errors: [
+        {
+          field: "publishDate",
+          code: "INVALID_DATE",
+          message: "publishDate must be a valid date using YYYY-MM-DD format."
+        }
+      ]
+    };
+
+    expect(input.schemaVersion).toBeUndefined();
+    expect(result.errors[0]?.code).toBe("INVALID_DATE");
   });
 });

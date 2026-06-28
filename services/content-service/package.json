@@ -10,7 +10,9 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit",
+    "pretest": "pnpm --filter @ecmp/shared-types build",
     "test": "vitest run",
+    "pretest:unit": "pnpm --filter @ecmp/shared-types build",
     "test:unit": "vitest run"
   },
   "dependencies": {
