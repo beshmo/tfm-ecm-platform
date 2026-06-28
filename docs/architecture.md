@@ -91,6 +91,7 @@ ecmp-platform/
 |           `-- features/
 |               |-- content/
 |               |-- content-types/
+|               |-- folders/
 |               `-- publication/
 |
 |-- services/
@@ -128,8 +129,9 @@ Responsibilities:
 
 * Authenticate users through the platform identity flow.
 * Manage content types where permitted.
+* Browse and manage hierarchical folders.
 * Create, read, update, and delete content instances.
-* Upload and manage file content metadata.
+* Upload and manage static file metadata.
 * Request content publication and unpublication.
 * Display content lifecycle status.
 * Surface validation errors from the backend APIs.
@@ -144,7 +146,7 @@ Technology:
 * Angular Forms
 * Angular HTTP Client
 
-The Management Frontend will follow the same architectural principles as the backend. Feature areas should be organized around business capabilities, such as content, content types, and publication.
+The Management Frontend will follow the same architectural principles as the backend. Feature areas should be organized around business capabilities, such as content, content types, folders, and publication.
 
 Planned feature structure:
 
@@ -175,7 +177,7 @@ Each service owns a specific part of the domain model and should expose that own
 | --- | --- |
 | Identity Service | Authentication, authorization, sessions, users, and role assignments. |
 | Content Type Service | Content type schemas and schema validation rules. |
-| Content Service | Content drafts, master records, content lifecycle state, and file metadata. |
+| Content Service | Content drafts, master records, folder hierarchy, content lifecycle state, and file metadata. |
 | Publication Service | Publication and unpublication requests, publication state, and publication events. |
 | Publication Worker | Execution of publication and unpublication events between Management and Delivery stages. |
 | Delivery Service | Published read model access and internal delivery queries. |
@@ -184,6 +186,7 @@ Each service owns a specific part of the domain model and should expose that own
 Ownership rules:
 
 * The Content Service is the source of truth for draft and master content records.
+* The Content Service is the source of truth for the folder hierarchy used to organize content instances.
 * The Content Type Service is the source of truth for schemas.
 * The Publication Service is the source of truth for publication requests.
 * The Delivery Service exposes published read models but does not own authoring content.
@@ -210,6 +213,7 @@ Owned by the Content Service.
 | Method | Endpoint | Description |
 | --- | --- | --- |
 | `GET` | `/api/management/contents` | List content records from the Management database. |
+| `GET` | `/api/management/contents?folderId={folderId}` | List content records assigned to a folder. |
 | `GET` | `/api/management/contents/{contentId}` | Retrieve a content record by ID. |
 | `POST` | `/api/management/contents` | Create a new draft content record. |
 | `PUT` | `/api/management/contents/{contentId}` | Replace an existing content record. |
@@ -220,12 +224,50 @@ Initial create/update payload shape:
 
 ```json
 {
+  "folderId": "FLD-root",
   "contentType": "generic",
   "data": {
     "title": "Welcome",
     "description": "First article",
     "publishDate": "2026-06-01"
   }
+}
+```
+
+#### Folder CRUD
+
+Owned by the Content Service.
+
+Folders organize content instances into a hierarchical tree. Folder operations are internal management operations used by the Management Frontend.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/management/folders` | List folders, optionally filtered by parent folder. |
+| `GET` | `/api/management/folders/{folderId}` | Retrieve a folder by ID. |
+| `POST` | `/api/management/folders` | Create a new folder under an existing parent folder. |
+| `PATCH` | `/api/management/folders/{folderId}` | Update folder metadata, such as the folder name. |
+| `DELETE` | `/api/management/folders/{folderId}` | Delete or archive a folder according to folder and content lifecycle rules. |
+| `GET` | `/api/management/folders/{folderId}/contents` | List content records assigned to a folder. |
+
+Initial create/update payload shape:
+
+```json
+{
+  "name": "folder2",
+  "parentFolderId": "FLD-550e8400-e29b-41d4-a716-446655440001"
+}
+```
+
+Initial response shape:
+
+```json
+{
+  "folderId": "FLD-550e8400-e29b-41d4-a716-446655440002",
+  "name": "folder2",
+  "parentFolderId": "FLD-550e8400-e29b-41d4-a716-446655440001",
+  "path": "/folder1/folder2",
+  "createdAt": "2026-06-01T10:00:00.000Z",
+  "updatedAt": "2026-06-01T10:00:00.000Z"
 }
 ```
 
@@ -276,7 +318,8 @@ Initial metadata response shape:
 
 ```json
 {
-  "fileId": "file-001",
+  "fileId": "STF-550e8400-e29b-41d4-a716-446655440002",
+  "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
   "filename": "manual.pdf",
   "mimeType": "application/pdf",
   "size": 124500,
@@ -307,7 +350,7 @@ Initial response shape:
 ```json
 {
   "requestId": "pub-001",
-  "contentId": "article-001",
+  "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
   "type": "publish",
   "status": "requested"
 }
@@ -336,7 +379,7 @@ Initial response shape:
 ```json
 {
   "requestId": "unpub-001",
-  "contentId": "article-001",
+  "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
   "type": "unpublish",
   "status": "requested"
 }
@@ -353,12 +396,13 @@ Delivery endpoints are internal read-only APIs backed by the Delivery MongoDB da
 | `GET` | `/api/delivery/contents` | List published content records from the Delivery database. |
 | `GET` | `/api/delivery/contents/{contentId}` | Retrieve a published content record by ID. |
 | `GET` | `/api/delivery/contents?contentType={contentType}` | List published content records by content type. |
+| `GET` | `/api/delivery/contents?folderId={folderId}` | List published content records by folder. |
 
 Initial response shape:
 
 ```json
 {
-  "contentId": "article-001",
+  "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
   "contentType": "generic",
   "version": 1,
   "publishedAt": "2026-06-01T10:00:00.000Z",
@@ -399,25 +443,27 @@ Storage:
 
 ### Content Service
 
-Manages content instances.
+Manages content instances, folders, and static file metadata.
 
 Ownership:
 
 * Content drafts
 * Master content records
+* Folder hierarchy
 * Content lifecycle state
 * File metadata
 
 Responsibilities:
 
 * Content CRUD operations
+* Folder CRUD operations
 * Content validation
 * Content lifecycle management
-* Versioning support in future phases
+* Basic content versioning
 
 Storage:
 
-* MongoDB for content metadata and structured content
+* MongoDB for content metadata, folder metadata, and structured content
 * Filesystem-backed storage for binary files
 
 ### Content Type Service
@@ -464,7 +510,7 @@ Dependencies:
 
 ### Publication Worker
 
-Consumes publication events and synchronizes content between Management and Delivery stages.
+Consumes publication events and projects or removes content between Management and Delivery stages.
 
 Responsibilities:
 
@@ -525,6 +571,18 @@ Content type schemas define:
 * Validation rules
 * Required fields
 * Extensibility rules
+
+### Internal Platform Types
+
+ECMP has internal platform types that are required by the system and are not modeled as user-defined content schemas.
+
+| Type | Description | Extensibility |
+| --- | --- | --- |
+| Folder | Internal type used to group content instances into a hierarchical tree. | Cannot be extended by users. |
+| Static file | Internal type used to represent uploaded binary files and their metadata. | Cannot be extended by users. |
+| Content type | Internal type used to define schemas for content instances. | Users can create new content type schemas as needed. |
+
+User-defined content types extend the platform by adding schemas for business content, such as articles, landing pages, or product descriptions. They do not extend the internal Folder or Static file types.
 
 ### Supported Field Types
 
@@ -589,25 +647,84 @@ fields:
 
 In this example, `title` is required and `description` is optional.
 
-### Content ID Strategy
+### Global ID Strategy
 
-Content records will use globally unique identifiers.
+Content records, folders, and static files will use globally unique identifiers generated by the platform.
 
 Initial rules:
 
-* The platform generates the `contentId`.
-* `contentId` must be globally unique across content types.
-* `contentId` remains stable for the lifetime of the content record.
+* The platform generates all record identifiers.
+* Global IDs must be unique across records of the same internal type.
+* IDs remain stable for the lifetime of the record.
 * Content type names are not part of the uniqueness boundary.
-* UUID v4 is the initial recommended format.
+* UUID v4 is the initial recommended value for the global ID suffix.
+* Content instance IDs use the `RCD-` prefix.
+* Folder IDs use the `FLD-` prefix.
+* Static file IDs use the `STF-` prefix.
+* The root folder `/` has a reserved folder ID.
 
 Example:
 
 ```text
-contentId: 550e8400-e29b-41d4-a716-446655440000
+contentId: RCD-550e8400-e29b-41d4-a716-446655440000
+folderId: FLD-550e8400-e29b-41d4-a716-446655440001
+fileId: STF-550e8400-e29b-41d4-a716-446655440002
+rootFolderId: FLD-root
 ```
 
-Some examples in this document use readable placeholder identifiers such as `article-001` to keep the documentation easy to follow.
+Some examples in this document may use readable placeholder identifiers to keep the documentation easy to follow, but implementation payloads should use prefixed global IDs.
+
+### Content Instance Metadata
+
+Content instances store system metadata separately from user-defined content data.
+
+Initial content metadata fields:
+
+| Field | Description |
+| --- | --- |
+| `contentId` | Globally unique content instance identifier generated by the platform, using the `RCD-` prefix. |
+| `folderId` | Folder that contains the content instance, using the `FLD-` prefix. |
+| `contentType` | User-defined content type schema name. |
+| `status` | Current content lifecycle state. |
+| `version` | Current integer content version. |
+| `createdAt` | UTC timestamp when the content record was created. |
+| `updatedAt` | UTC timestamp when the content record was last updated. |
+
+The `folderId` field tracks where the content instance belongs in the folder tree. A content instance may be assigned to the reserved root folder when it is not placed in a child folder.
+
+### Folder Model
+
+Folders group content instances into a hierarchical tree similar to a filesystem directory structure.
+
+Initial folder fields:
+
+| Field | Description |
+| --- | --- |
+| `folderId` | Globally unique folder identifier generated by the platform, using the `FLD-` prefix. |
+| `name` | Folder display name and path segment. |
+| `parentFolderId` | Parent folder ID. The root folder uses a reserved ID and has no regular parent. |
+| `path` | Materialized folder path, such as `/folder1/folder2`. |
+| `createdAt` | UTC timestamp when the folder was created. |
+| `updatedAt` | UTC timestamp when the folder was last updated. |
+
+Root folder rules:
+
+* The root folder path is `/`.
+* The root folder has a reserved ID: `FLD-root`.
+* User-created folders must have a valid parent folder ID.
+* Folder paths are derived from parent folder paths and folder names.
+
+Folder validation rules:
+
+* Folder names must follow filesystem-like validation rules.
+* Folder names must not be empty.
+* Folder names must not contain path separators such as `/` or `\`.
+* Folder names must not be `.` or `..`.
+* Folder names must not contain control characters.
+* Folder names should avoid symbols that are invalid or unsafe on common filesystems.
+* Folder names must be unique within the same parent folder.
+
+Exact forbidden symbol lists may be refined during implementation based on the target operating systems and storage strategy.
 
 ### Basic Versioning
 
@@ -627,7 +744,8 @@ Example:
 
 ```json
 {
-  "contentId": "550e8400-e29b-41d4-a716-446655440000",
+  "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
+  "folderId": "FLD-root",
   "contentType": "generic",
   "version": 3,
   "status": "approved",
@@ -643,8 +761,8 @@ Initial file metadata fields:
 
 | Field | Description |
 | --- | --- |
-| `fileId` | Globally unique file identifier generated by the platform. |
-| `contentId` | Content record associated with the file. |
+| `fileId` | Globally unique static file identifier generated by the platform, using the `STF-` prefix. |
+| `contentId` | Content record associated with the file, using the `RCD-` prefix. |
 | `filename` | Original or normalized file name. |
 | `mimeType` | MIME type detected or provided during upload. |
 | `size` | File size in bytes. |
@@ -656,8 +774,8 @@ Example:
 
 ```json
 {
-  "fileId": "file-001",
-  "contentId": "550e8400-e29b-41d4-a716-446655440000",
+  "fileId": "STF-550e8400-e29b-41d4-a716-446655440002",
+  "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
   "filename": "manual.pdf",
   "mimeType": "application/pdf",
   "size": 124500,
@@ -667,13 +785,13 @@ Example:
 }
 ```
 
-## Initial Content Types
+## Initial Platform and Content Types
 
-The first platform version will support two content types.
+The first platform version will include internal platform types plus user-defined content types.
 
-### Generic Content
+### Generic Content Type
 
-Generic content represents structured editorial content.
+Generic content is the first example of a user-defined content type. It represents structured editorial content.
 
 Example use cases:
 
@@ -685,16 +803,17 @@ Example use cases:
 Example:
 
 ```yaml
-id: article-001
+id: RCD-550e8400-e29b-41d4-a716-446655440000
+folderId: FLD-root
 type: generic
 title: Welcome
 description: First article
 publishDate: 2026-06-01
 ```
 
-### File Content
+### Static File Type
 
-File content represents binary assets. The binary file will be stored in a configured filesystem-backed storage location, while metadata will be stored in MongoDB.
+Static file is an internal platform type used to represent binary assets. The binary file will be stored in a configured filesystem-backed storage location, while metadata will be stored in MongoDB. Users cannot extend the Static file type.
 
 Example use cases:
 
@@ -706,12 +825,28 @@ Example use cases:
 Example metadata:
 
 ```yaml
-id: file-001
-type: file
+id: STF-550e8400-e29b-41d4-a716-446655440002
+contentId: RCD-550e8400-e29b-41d4-a716-446655440000
+type: static-file
 filename: manual.pdf
 mimeType: application/pdf
 size: 124500
 path: /content/files/manual.pdf
+```
+
+### Folder Type
+
+Folder is an internal platform type used to organize content instances. Users cannot extend the Folder type.
+
+Example:
+
+```yaml
+id: FLD-550e8400-e29b-41d4-a716-446655440001
+name: folder1
+parentFolderId: FLD-root
+path: /folder1
+createdAt: 2026-06-01T10:00:00.000Z
+updatedAt: 2026-06-01T10:00:00.000Z
 ```
 
 ## Content Lifecycle
@@ -743,7 +878,8 @@ Initial delivery projection shape:
 
 ```json
 {
-  "contentId": "article-001",
+  "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
+  "folderId": "FLD-root",
   "contentType": "generic",
   "version": 1,
   "publishedAt": "2026-06-01T10:00:00.000Z",
@@ -759,6 +895,7 @@ Projection rules:
 
 * Only fields intended for delivery should be written into the Delivery database.
 * Authoring-only metadata, workflow state, and management permissions must stay in the Management database.
+* Folder identity may be included in the Delivery projection when internal delivery clients need to query or display content by folder.
 * The Delivery model may evolve independently from the Management model.
 * The first projection should preserve the validated content `data` structure unless a content type requires delivery-specific transformation.
 * Projection logic should be covered by unit and integration tests.
@@ -906,12 +1043,13 @@ Emitted by the Publication Service when a publisher requests content publication
   "eventType": "content.publish.requested",
   "eventVersion": "1.0",
   "occurredAt": "2026-06-01T10:00:00.000Z",
-  "correlationId": "corr-article-001-publication",
+  "correlationId": "corr-RCD-550e8400-e29b-41d4-a716-446655440000-publication",
   "causationId": "pub-001",
   "source": "publication-service",
   "data": {
     "publicationRequestId": "pub-001",
-    "contentId": "article-001",
+    "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
+    "folderId": "FLD-root",
     "contentType": "generic",
     "contentVersion": 1,
     "requestedBy": "user-001",
@@ -925,7 +1063,7 @@ Emitted by the Publication Service when a publisher requests content publication
 
 #### Published
 
-Emitted after the Publication Worker successfully synchronizes content into the Delivery Stage.
+Emitted after the Publication Worker successfully projects content into the Delivery Stage.
 
 ```json
 {
@@ -933,16 +1071,17 @@ Emitted after the Publication Worker successfully synchronizes content into the 
   "eventType": "content.published",
   "eventVersion": "1.0",
   "occurredAt": "2026-06-01T10:00:05.000Z",
-  "correlationId": "corr-article-001-publication",
+  "correlationId": "corr-RCD-550e8400-e29b-41d4-a716-446655440000-publication",
   "causationId": "evt-publish-requested-001",
   "source": "publication-worker",
   "data": {
     "publicationRequestId": "pub-001",
-    "contentId": "article-001",
+    "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
+    "folderId": "FLD-root",
     "contentType": "generic",
     "contentVersion": 1,
     "publishedAt": "2026-06-01T10:00:05.000Z",
-    "deliveryRecordId": "article-001",
+    "deliveryRecordId": "RCD-550e8400-e29b-41d4-a716-446655440000",
     "deliveryDatabase": "ecmp_delivery"
   }
 }
@@ -958,16 +1097,17 @@ Emitted when the Publication Worker cannot complete publication.
   "eventType": "content.publish.failed",
   "eventVersion": "1.0",
   "occurredAt": "2026-06-01T10:00:05.000Z",
-  "correlationId": "corr-article-001-publication",
+  "correlationId": "corr-RCD-550e8400-e29b-41d4-a716-446655440000-publication",
   "causationId": "evt-publish-requested-001",
   "source": "publication-worker",
   "data": {
     "publicationRequestId": "pub-001",
-    "contentId": "article-001",
+    "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
+    "folderId": "FLD-root",
     "contentType": "generic",
     "contentVersion": 1,
-    "failureCode": "DELIVERY_SYNC_FAILED",
-    "failureMessage": "Unable to synchronize content into the Delivery database.",
+    "failureCode": "DELIVERY_PROJECTION_FAILED",
+    "failureMessage": "Unable to project content into the Delivery database.",
     "automaticRetry": false,
     "manualRetryAllowed": true,
     "attempt": 1
@@ -985,12 +1125,13 @@ Emitted by the Publication Service when a publisher requests content removal fro
   "eventType": "content.unpublish.requested",
   "eventVersion": "1.0",
   "occurredAt": "2026-06-01T11:00:00.000Z",
-  "correlationId": "corr-article-001-unpublication",
+  "correlationId": "corr-RCD-550e8400-e29b-41d4-a716-446655440000-unpublication",
   "causationId": "unpub-001",
   "source": "publication-service",
   "data": {
     "unpublicationRequestId": "unpub-001",
-    "contentId": "article-001",
+    "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
+    "folderId": "FLD-root",
     "contentType": "generic",
     "contentVersion": 1,
     "requestedBy": "user-001",
@@ -1011,16 +1152,17 @@ Emitted after the Publication Worker successfully removes content from the Deliv
   "eventType": "content.unpublished",
   "eventVersion": "1.0",
   "occurredAt": "2026-06-01T11:00:05.000Z",
-  "correlationId": "corr-article-001-unpublication",
+  "correlationId": "corr-RCD-550e8400-e29b-41d4-a716-446655440000-unpublication",
   "causationId": "evt-unpublish-requested-001",
   "source": "publication-worker",
   "data": {
     "unpublicationRequestId": "unpub-001",
-    "contentId": "article-001",
+    "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
+    "folderId": "FLD-root",
     "contentType": "generic",
     "contentVersion": 1,
     "unpublishedAt": "2026-06-01T11:00:05.000Z",
-    "deliveryRecordId": "article-001",
+    "deliveryRecordId": "RCD-550e8400-e29b-41d4-a716-446655440000",
     "deliveryDatabase": "ecmp_delivery"
   }
 }
@@ -1036,12 +1178,13 @@ Emitted when the Publication Worker cannot complete unpublication.
   "eventType": "content.unpublish.failed",
   "eventVersion": "1.0",
   "occurredAt": "2026-06-01T11:00:05.000Z",
-  "correlationId": "corr-article-001-unpublication",
+  "correlationId": "corr-RCD-550e8400-e29b-41d4-a716-446655440000-unpublication",
   "causationId": "evt-unpublish-requested-001",
   "source": "publication-worker",
   "data": {
     "unpublicationRequestId": "unpub-001",
-    "contentId": "article-001",
+    "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
+    "folderId": "FLD-root",
     "contentType": "generic",
     "contentVersion": 1,
     "failureCode": "DELIVERY_REMOVAL_FAILED",
@@ -1062,6 +1205,8 @@ Payload fields may be refined when the publication retry strategy, failure handl
 | Authoring structured content | Management MongoDB database |
 | Published structured content | Delivery MongoDB database |
 | Content type schemas | Management MongoDB database |
+| Folder metadata | Management MongoDB database |
+| Folder metadata | Delivery MongoDB database, when folder information is projected for internal delivery queries |
 | File metadata | Management MongoDB database |
 | File metadata | Delivery MongoDB database |
 | Binary files | Management Filesystem-backed storage path or mounted volume |
@@ -1077,11 +1222,28 @@ Management and Delivery data must not share the same MongoDB collections. The mi
 ```json
 {
   "_id": "...",
-  "contentId": "...",
+  "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
+  "folderId": "FLD-root",
   "contentType": "generic",
   "status": "published",
   "version": 1,
-  "data": {}
+  "data": {},
+  "createdAt": "2026-06-01T10:00:00.000Z",
+  "updatedAt": "2026-06-01T10:00:00.000Z"
+}
+```
+
+### Folder Collection
+
+```json
+{
+  "_id": "...",
+  "folderId": "FLD-550e8400-e29b-41d4-a716-446655440001",
+  "name": "folder1",
+  "parentFolderId": "FLD-root",
+  "path": "/folder1",
+  "createdAt": "2026-06-01T10:00:00.000Z",
+  "updatedAt": "2026-06-01T10:00:00.000Z"
 }
 ```
 
@@ -1100,8 +1262,8 @@ Management and Delivery data must not share the same MongoDB collections. The mi
 
 ```json
 {
-  "fileId": "file-001",
-  "contentId": "550e8400-e29b-41d4-a716-446655440000",
+  "fileId": "STF-550e8400-e29b-41d4-a716-446655440002",
+  "contentId": "RCD-550e8400-e29b-41d4-a716-446655440000",
   "filename": "manual.pdf",
   "mimeType": "application/pdf",
   "size": 124500,

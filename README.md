@@ -16,6 +16,7 @@ The main objectives of ECMP are:
 
 * Provide enterprise-grade content management capabilities.
 * Provide a frontend for content authors and administrators.
+* Organize content instances in hierarchical folders.
 * Use a microservices architecture from the beginning.
 * Support horizontal scaling through stateless application services.
 * Use schema-driven content definitions.
@@ -107,6 +108,7 @@ ecmp-platform/
 
 * Implement content type schemas.
 * Implement content validation.
+* Implement hierarchical folder management.
 * Implement content CRUD operations.
 * Connect the Management Frontend to content CRUD APIs.
 * Implement file metadata management.
