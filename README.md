@@ -92,8 +92,15 @@ ecmp-platform/
 * Define the architecture.
 * Define the initial content model.
 * Define service responsibilities.
+* Define initial REST API contracts.
+* Define the frontend architecture.
 * Define the publication workflow.
 * Decide the final Management and Delivery storage separation.
+* Define the security model.
+* Define the deployment architecture.
+* Define the testing architecture.
+* Define observability standards.
+* Record important architecture decisions as ADRs.
 
 ### Phase 2 - Project Scaffold
 
