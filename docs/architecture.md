@@ -167,6 +167,102 @@ Layer responsibilities:
 | Infrastructure | REST clients, DTO mapping, and API gateway communication. |
 | Presentation | Angular components, pages, forms, view models, and UI state. |
 
+### Frontend Architecture
+
+The first Management Frontend implementation should stay focused on the core authoring experience. It will start with a minimal route structure and one main authenticated workspace: the folder explorer.
+
+The Management Frontend will use standalone Angular components and route-based feature areas. New features should not use Angular NgModules unless a future library or third-party integration requires it.
+
+Initial Angular app structure:
+
+```text
+src/app/
+|-- core/
+|   |-- auth/
+|   |-- guards/
+|   |-- http/
+|   `-- layout/
+|-- shared/
+|   |-- components/
+|   |-- forms/
+|   `-- ui-state/
+`-- features/
+    |-- auth/
+    |-- content/
+    |-- content-types/
+    |-- folder-explorer/
+    |-- folders/
+    `-- publication/
+```
+
+Feature area responsibilities:
+
+| Feature area | Responsibility |
+| --- | --- |
+| `auth` | Login flow, session state, and authentication UI. |
+| `folder-explorer` | Composition workspace that coordinates folder, content, file, and publication workflows. |
+| `folders` | Folder domain rules, folder use cases, folder API integration, and folder presentation pieces. |
+| `content` | Content instance domain rules, content use cases, content API integration, and content presentation pieces. |
+| `content-types` | Content type schema management and schema-driven form support. |
+| `publication` | Publish and unpublish use cases, request status handling, and publication API integration. |
+
+The `folder-explorer` feature coordinates user workflows but does not own the domain rules for folders, content instances, static files, or publication. Those rules remain in the owning business capability feature areas.
+
+Frontend feature boundaries:
+
+| Layer | Contains | Must not contain |
+| --- | --- | --- |
+| `domain` | Entities, value objects, domain validation, lifecycle rules, and business invariants. | Angular components, HTTP clients, API DTOs, or UI state. |
+| `application` | Use cases such as creating folders, updating content instances, deleting records, publishing, and unpublishing. | DOM logic, direct API response handling, or component-specific state. |
+| `infrastructure` | REST clients, DTOs, mappers, API Gateway adapters, and persistence-facing concerns. | Business rules or lifecycle decisions. |
+| `presentation` | Angular standalone components, pages, forms, dialogs, view models, and UI state. | Direct backend calls or business mutations that bypass application use cases. |
+
+Each business capability should own its domain, application, infrastructure, and presentation code only where needed. Empty architectural folders are not required during the first implementation.
+
+Initial routes:
+
+| Route | Screen | Access |
+| --- | --- | --- |
+| `/login` | Login screen | Anonymous users. |
+| `/folders` | Folder explorer workspace using the root folder by default. | Authenticated users. |
+| `/folders/:folderId` | Folder explorer workspace scoped to a selected folder. | Authenticated users. |
+| `/` | Redirect to `/folders` when authenticated, otherwise `/login`. | All users. |
+| `/**` | Redirect to `/folders` or show a not-found state. | All users. |
+
+Initial screens:
+
+| Screen | Purpose |
+| --- | --- |
+| Login | Authenticate a user and start a management session. |
+| Folder explorer | Single-page authenticated workspace for browsing folders, viewing content instances, and running management operations. |
+
+The folder explorer should provide a toolbar for the main authoring operations. The first toolbar can include actions for creating folders, renaming folders, deleting folders, creating content instances, updating content instances, deleting or archiving content instances, uploading static files, publishing, and unpublishing.
+
+Folder explorer layout:
+
+| Area | Responsibility |
+| --- | --- |
+| Toolbar | Primary create, update, delete, publish, and unpublish actions. |
+| Folder tree | Hierarchical folder navigation starting from the reserved root folder. |
+| Content list | Content instances and static files assigned to the selected folder. |
+| Detail panel or modal | Forms for creating and updating folders, content instances, and static file metadata. |
+| Status area | Validation errors, lifecycle state, publication status, and operation feedback. |
+
+Initial user workflows:
+
+| Workflow | Steps |
+| --- | --- |
+| Create folder | Select a parent folder, choose create folder, enter a valid folder name, submit, refresh the folder tree. |
+| Update folder | Select a folder, choose rename or update, submit the new folder metadata, refresh the folder tree and current path. |
+| Delete folder | Select a folder, choose delete, confirm the action, refresh the folder tree according to lifecycle rules. |
+| Create content instance | Select a folder, choose create content, select a content type, complete the generated form, submit, show the new record in the selected folder. |
+| Update content instance | Select a content instance, edit supported fields, submit changes, increment the content version, refresh the content list. |
+| Delete content instance | Select a content instance, choose delete or archive, confirm the action, refresh the content list. |
+| Publish content instance | Select an approved content instance, choose publish, create a publication request, show request status and lifecycle feedback. |
+| Unpublish content instance | Select a published content instance, choose unpublish, create an unpublication request, show request status and lifecycle feedback. |
+
+The first implementation should avoid deep navigation. Content editing, folder editing, and publication actions can be handled inside the folder explorer through panels, dialogs, or inline forms as long as the feature boundaries remain separated in the Angular code.
+
 ## Planned Microservices
 
 ### Service Boundaries
