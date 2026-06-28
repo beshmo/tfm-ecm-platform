@@ -100,7 +100,7 @@ ecmp-platform/
 * Scaffold the Angular Management Frontend.
 * Configure TypeScript and NestJS.
 * Add shared packages.
-* Add Docker support for local development.
+* Add Docker Compose support for local development.
 * Add basic CI checks.
 * Add the initial frontend unit test setup.
 
@@ -129,6 +129,7 @@ ecmp-platform/
 
 * Implement the Delivery Service.
 * Add Kubernetes manifests or Helm charts.
+* Add Management and Delivery persistent file storage volumes.
 * Add observability basics.
 * Document local and Kubernetes deployment.
 

@@ -1685,9 +1685,59 @@ The platform will follow the Twelve-Factor App methodology where applicable:
 | Logs | Logs are emitted to stdout and stderr. |
 | Admin processes | Administrative tasks run as one-off processes. |
 
-## Kubernetes Deployment Model
+## Deployment Architecture
+
+ECMP should support two initial deployment shapes:
+
+* Docker Compose for local development.
+* Kubernetes for the reference deployment model.
+
+The first implementation should keep deployment infrastructure simple while preserving the same service boundaries used by the application architecture.
+
+### Local Development
+
+Docker Compose will be used for local development.
+
+Initial local services:
+
+```text
+management-frontend
+api-gateway
+identity-service
+content-service
+content-type-service
+publication-service
+publication-worker
+delivery-service
+mongodb
+redis
+rabbitmq
+```
+
+Local development goals:
+
+* Start the platform with one command.
+* Run one container per frontend, backend service, and infrastructure dependency.
+* Use environment variables for local configuration.
+* Mount local directories for filesystem-backed file storage.
+* Keep Management and Delivery storage paths separated.
+
+Initial local filesystem storage:
+
+| Storage area | Local mount intent |
+| --- | --- |
+| Management file storage | Local directory mounted into services that manage authoring/static file uploads. |
+| Delivery file storage | Local directory mounted into services that serve or project published static files. |
+
+### Kubernetes Deployment Model
 
 The reference deployment platform is Kubernetes.
+
+All ECMP Kubernetes resources will be deployed into a single namespace:
+
+```text
+ecmp
+```
 
 Planned workloads:
 
@@ -1702,6 +1752,12 @@ publication-worker
 delivery-service
 ```
 
+Initial namespace layout:
+
+| Namespace | Contains |
+| --- | --- |
+| `ecmp` | ECMP application workloads, services, ingress, config maps, secrets, and persistent volume claims. |
+
 Deployment goals:
 
 * Multiple replicas for stateless services.
@@ -1710,6 +1766,82 @@ Deployment goals:
 * Queue-aware scaling for publication workers.
 * Health checks and readiness probes.
 * Externalized configuration through Kubernetes resources.
+
+### Configuration and Secrets
+
+The first Kubernetes configuration strategy should start with the minimum needed to run the platform.
+
+Initial configuration strategy:
+
+| Concern | Kubernetes resource | Examples |
+| --- | --- | --- |
+| Non-sensitive configuration | ConfigMap | Service ports, database names, queue names, storage paths, public base URLs. |
+| Sensitive configuration | Secret | JWT signing secrets, refresh token secrets, MongoDB credentials, Redis credentials, RabbitMQ credentials. |
+| Runtime injection | Environment variables | Values loaded into pods from ConfigMaps and Secrets. |
+
+Initial rules:
+
+* Do not hardcode secrets in source code, Docker images, or Kubernetes manifests.
+* Use separate environment variables per service when values differ.
+* Keep local development secrets simple and clearly non-production.
+* Production-grade secret management can be introduced later if required.
+
+### Persistent Volumes
+
+Filesystem-backed file storage requires persistent storage in Kubernetes.
+
+Initial persistent volume plan:
+
+| Volume | PersistentVolume | PersistentVolumeClaim | Mounted by |
+| --- | --- | --- | --- |
+| Management file storage | `ecmp-management-files-pv` | `ecmp-management-files-pvc` | Content Service and services that need authoring file access. |
+| Delivery file storage | `ecmp-delivery-files-pv` | `ecmp-delivery-files-pvc` | Publication Worker and Delivery Service. |
+
+Initial rules:
+
+* Management and Delivery file storage must use separate persistent volumes and claims.
+* Management file storage is the source for authoring/static file uploads.
+* Delivery file storage contains published file projections for internal delivery access.
+* The Publication Worker is responsible for moving or projecting published file data from Management storage to Delivery storage according to the publication workflow.
+* Storage classes, access modes, and capacity values will be selected during implementation based on the local cluster or target Kubernetes environment.
+
+### Ingress and API Gateway Routing
+
+Ingress exposes the platform entry points and routes traffic to the correct internal service.
+
+Initial routing shape:
+
+```text
+Client
+  |
+  v
+Kubernetes Ingress
+  |
+  |-- / -> management-frontend
+  `-- /api -> api-gateway
+```
+
+The API Gateway routes API traffic to backend services.
+
+Initial API Gateway routing:
+
+| Public path | Routed to |
+| --- | --- |
+| `/api/auth/*` | Identity Service |
+| `/api/management/contents*` | Content Service |
+| `/api/management/folders*` | Content Service |
+| `/api/management/files*` | Content Service |
+| `/api/management/content-types*` | Content Type Service |
+| `/api/management/*publication-requests*` | Publication Service |
+| `/api/delivery/contents*` | Delivery Service |
+
+Ingress and gateway rules:
+
+* HTTPS is required for authenticated traffic.
+* The Management Frontend is served as the main browser entry point.
+* Backend services are not exposed directly outside the cluster.
+* The API Gateway performs edge authentication and request routing.
+* Service-to-service traffic remains inside the `ecmp` namespace by default.
 
 ## Observability
 
