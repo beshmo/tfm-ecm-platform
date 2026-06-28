@@ -53,6 +53,62 @@ Detailed technical documentation lives in the `docs` directory:
 
 REST will be the initial and primary API style. GraphQL may be considered later as a future enhancement.
 
+## Required Applications and Tools
+
+The following tools are needed to implement and run the Phase 2 project scaffold.
+
+### Required Local Tools
+
+| Tool | Purpose |
+| --- | --- |
+| Git | Version control and commit workflow. |
+| Node.js LTS | Runtime for Angular, NestJS, TypeScript tooling, tests, and package scripts. |
+| Corepack | Enables package managers such as `pnpm` from the Node.js installation. |
+| pnpm | Recommended monorepo package manager. |
+| Docker Desktop | Runs local containers for infrastructure dependencies and service images. |
+| Docker Compose v2 | Starts the local development stack with `docker compose up`. |
+| VS Code or another IDE | Code editing, TypeScript support, debugging, and Git integration. |
+| Modern browser | Runs and verifies the Angular Management Frontend. |
+
+### Project CLIs
+
+Project scaffolding can use local repository dependencies or one-off commands through `pnpm dlx`.
+
+| Tool | Purpose |
+| --- | --- |
+| Angular CLI | Scaffolds and manages the Angular Management Frontend. |
+| NestJS CLI | Scaffolds backend services. |
+| TypeScript | Provides compile and typecheck support across apps, services, and packages. |
+
+Example commands:
+
+```bash
+pnpm dlx @angular/cli new management-frontend
+pnpm dlx @nestjs/cli new api-gateway
+```
+
+### Testing Tools
+
+These tools should be installed as repository dependencies during Phase 2 instead of global applications.
+
+| Tool | Purpose |
+| --- | --- |
+| Vitest | Unit tests for frontend, shared packages, and optionally backend code. |
+| Angular testing utilities | Angular component and integration tests. |
+| Playwright | End-to-end browser workflows. |
+| Jest | Optional alternative for NestJS tests if the scaffold keeps NestJS defaults. |
+
+### Optional Tools
+
+| Tool | Purpose |
+| --- | --- |
+| GitHub CLI | Pull request and CI workflow inspection. |
+| MongoDB Compass | Visual inspection of MongoDB data during later implementation phases. |
+| Postman or Insomnia | Manual REST API testing. |
+| kubectl, Helm, kind, or minikube | Kubernetes development and validation in later phases. |
+
+MongoDB, Redis, and RabbitMQ do not need to be installed directly on the host machine for local development. They should run through Docker Compose.
+
 ## Planned Repository Structure
 
 ```text
