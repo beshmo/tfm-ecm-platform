@@ -4,6 +4,8 @@ This document describes the planned architecture for the Enterprise Content Mana
 
 The architecture is still evolving. Open decisions are documented explicitly so they can be resolved during the specification phase.
 
+Important architecture decisions are tracked as Architecture Decision Records in [docs/adr](adr/README.md).
+
 ## System Context
 
 ECMP is intended to be used by authenticated internal users through the Management Frontend. The platform does not currently expose a public consumer-facing experience or public external API.
