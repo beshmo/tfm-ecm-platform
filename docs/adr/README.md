@@ -23,4 +23,4 @@ ADRs capture decisions that shape implementation direction. They should be updat
 | [ADR-0013](0013-use-docker-compose-and-kubernetes-ecmp-namespace.md) | Use Docker Compose locally and Kubernetes namespace `ecmp` | Accepted |
 | [ADR-0014](0014-define-layered-testing-targets.md) | Define layered testing targets | Accepted |
 | [ADR-0015](0015-standardize-observability-with-opentelemetry.md) | Standardize observability with OpenTelemetry | Accepted |
-
+| [ADR-0016](0016-use-yaml-for-author-facing-content-type-schemas.md) | Use YAML for author-facing content type schemas | Accepted |
