@@ -31,6 +31,7 @@ Detailed technical documentation lives in the `docs` directory:
 
 * [Architecture](docs/architecture.md)
 * [Architecture Decision Records](docs/adr/README.md)
+* [Security Reports](docs/security/README.md)
 
 ## Technology Stack
 
