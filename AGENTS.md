@@ -2,9 +2,9 @@
 
 ## Project Structure & Module Organization
 
-This repository is currently in Phase 1: architecture and specification. The main project overview is in `README.md`; detailed technical decisions live in `docs/architecture.md`; Architecture Decision Records live in `docs/adr/`.
+This repository is currently in Phase 2: project scaffold. The main project overview is in `README.md`; detailed technical decisions live in `docs/architecture.md`; Architecture Decision Records live in `docs/adr/`.
 
-The planned monorepo structure is:
+The monorepo structure is:
 
 ```text
 apps/management-frontend/     Angular Management Frontend
@@ -19,15 +19,17 @@ Keep architecture updates in `docs/architecture.md` and durable decisions in ADR
 
 ## Build, Test, and Development Commands
 
-No application scaffold exists yet, so there are no build or test scripts to run today. Until Phase 2 is implemented, use these checks:
+Use these commands from the repository root:
 
 ```bash
-git status --short        # Review changed files
-git diff --check          # Detect whitespace issues
-git log --oneline -5      # Inspect recent commit style
+pnpm install              # Install workspace dependencies
+pnpm typecheck            # Build dependencies and run TypeScript checks
+pnpm lint                 # Run the current lint gate, backed by TypeScript
+pnpm test                 # Run all unit and smoke tests
+pnpm build                # Build shared packages, services, and frontend
+pnpm dev:frontend         # Start the Angular Management Frontend
+docker compose up --build # Start the local stack
 ```
-
-After the scaffold is added, expected commands should include workspace-level scripts such as `pnpm install`, `pnpm test`, `pnpm lint`, `pnpm build`, and `docker compose up`.
 
 ## Coding Style & Naming Conventions
 

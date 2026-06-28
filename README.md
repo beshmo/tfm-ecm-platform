@@ -1,14 +1,14 @@
 # TFM - Enterprise Content Management Platform (ECMP)
 
-ECMP is a cloud-native Enterprise Content Management Platform designed as the final project for a TFM academic work. The repository will contain the platform implementation, but the project is currently in the architecture and specification phase.
+ECMP is a cloud-native Enterprise Content Management Platform designed as the final project for a TFM academic work. The repository contains the initial runnable monorepo scaffold and the architecture/specification documentation.
 
 The goal is to build a portfolio-ready system that demonstrates enterprise architecture, microservices, frontend-driven content management, asynchronous publication workflows, containerized deployment, and Kubernetes-oriented operations.
 
 ## Current Status
 
-This project is not implemented yet.
+The project is in Phase 2: project scaffold.
 
-At this stage, the repository contains the initial architectural definition and project direction. Source code, service scaffolding, infrastructure manifests, and development instructions will be added in later phases.
+At this stage, the repository contains the Angular Management Frontend shell, NestJS service shells, shared packages, Docker Compose support, and basic CI checks. Business features are not implemented yet.
 
 ## Objectives
 
@@ -109,7 +109,7 @@ These tools should be installed as repository dependencies during Phase 2 instea
 
 MongoDB, Redis, and RabbitMQ do not need to be installed directly on the host machine for local development. They should run through Docker Compose.
 
-## Planned Repository Structure
+## Repository Structure
 
 ```text
 ecmp-platform/
@@ -133,9 +133,7 @@ ecmp-platform/
 |
 |-- infrastructure/
 |   |-- kubernetes/
-|   |-- helm/
-|   |-- docker/
-|   `-- terraform/
+|   `-- docker/
 |
 |-- docs/
 `-- .github/
@@ -160,13 +158,13 @@ ecmp-platform/
 
 ### Phase 2 - Project Scaffold
 
-* Create the monorepo structure.
-* Scaffold the Angular Management Frontend.
-* Configure TypeScript and NestJS.
-* Add shared packages.
-* Add Docker Compose support for local development.
-* Add basic CI checks.
-* Add the initial frontend unit test setup.
+* Create the monorepo structure. Done.
+* Scaffold the Angular Management Frontend. Done.
+* Configure TypeScript and NestJS. Done.
+* Add shared packages. Done.
+* Add Docker Compose support for local development. Done.
+* Add basic CI checks. Done.
+* Add the initial frontend unit test setup. Done.
 
 ### Phase 3 - Core Content Management
 
@@ -199,7 +197,44 @@ ecmp-platform/
 
 ## Quick Start
 
-Implementation instructions will be added once the first services are scaffolded.
+Install dependencies from the repository root:
+
+```bash
+pnpm install
+```
+
+Run validation checks:
+
+```bash
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm build
+```
+
+Run the Angular Management Frontend:
+
+```bash
+pnpm dev:frontend
+```
+
+Run an individual backend service:
+
+```bash
+pnpm dev:api-gateway
+```
+
+Start the local infrastructure dependencies:
+
+```bash
+docker compose up -d mongodb redis rabbitmq
+```
+
+Start the full local Compose stack:
+
+```bash
+docker compose up --build
+```
 
 ## License
 

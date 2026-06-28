@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ecmp/shared-types": ["packages/shared-types/dist/index.d.ts"],
+      "@ecmp/shared-events": ["packages/shared-events/dist/index.d.ts"],
+      "@ecmp/shared-auth": ["packages/shared-auth/dist/index.d.ts"],
+      "@ecmp/shared-yaml": ["packages/shared-yaml/dist/index.d.ts"]
+    }
+  }
+}

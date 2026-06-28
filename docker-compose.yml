@@ -1,0 +1,167 @@
+services:
+  management-frontend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/node-app.Dockerfile
+      args:
+        PACKAGE_FILTER: "@ecmp/management-frontend"
+    command: pnpm --filter @ecmp/management-frontend start
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+    ports:
+      - "${MANAGEMENT_FRONTEND_PORT:-4200}:4200"
+    depends_on:
+      - api-gateway
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/node-app.Dockerfile
+      args:
+        PACKAGE_FILTER: "@ecmp/api-gateway"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+    ports:
+      - "${API_GATEWAY_PORT:-3000}:3000"
+    depends_on:
+      - identity-service
+      - content-service
+      - content-type-service
+      - publication-service
+      - delivery-service
+
+  identity-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/node-app.Dockerfile
+      args:
+        PACKAGE_FILTER: "@ecmp/identity-service"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3001
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "${IDENTITY_SERVICE_PORT:-3001}:3001"
+    depends_on:
+      - redis
+
+  content-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/node-app.Dockerfile
+      args:
+        PACKAGE_FILTER: "@ecmp/content-service"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3002
+      MONGODB_URI: mongodb://ecmp:ecmp-local@mongodb:27017/ecmp_management?authSource=admin
+      FILE_STORAGE_PATH: ${MANAGEMENT_FILE_STORAGE_PATH:-/var/lib/ecmp/management-files}
+    ports:
+      - "${CONTENT_SERVICE_PORT:-3002}:3002"
+    volumes:
+      - management-file-storage:${MANAGEMENT_FILE_STORAGE_PATH:-/var/lib/ecmp/management-files}
+    depends_on:
+      - mongodb
+
+  content-type-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/node-app.Dockerfile
+      args:
+        PACKAGE_FILTER: "@ecmp/content-type-service"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3003
+      MONGODB_URI: mongodb://ecmp:ecmp-local@mongodb:27017/ecmp_management?authSource=admin
+    ports:
+      - "${CONTENT_TYPE_SERVICE_PORT:-3003}:3003"
+    depends_on:
+      - mongodb
+
+  publication-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/node-app.Dockerfile
+      args:
+        PACKAGE_FILTER: "@ecmp/publication-service"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3004
+      MONGODB_URI: mongodb://ecmp:ecmp-local@mongodb:27017/ecmp_management?authSource=admin
+      RABBITMQ_URL: amqp://ecmp:ecmp-local@rabbitmq:5672
+    ports:
+      - "${PUBLICATION_SERVICE_PORT:-3004}:3004"
+    depends_on:
+      - mongodb
+      - rabbitmq
+
+  publication-worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/node-app.Dockerfile
+      args:
+        PACKAGE_FILTER: "@ecmp/publication-worker"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3005
+      MANAGEMENT_MONGODB_URI: mongodb://ecmp:ecmp-local@mongodb:27017/ecmp_management?authSource=admin
+      DELIVERY_MONGODB_URI: mongodb://ecmp:ecmp-local@mongodb:27017/ecmp_delivery?authSource=admin
+      RABBITMQ_URL: amqp://ecmp:ecmp-local@rabbitmq:5672
+      MANAGEMENT_FILE_STORAGE_PATH: ${MANAGEMENT_FILE_STORAGE_PATH:-/var/lib/ecmp/management-files}
+      DELIVERY_FILE_STORAGE_PATH: ${DELIVERY_FILE_STORAGE_PATH:-/var/lib/ecmp/delivery-files}
+    ports:
+      - "${PUBLICATION_WORKER_PORT:-3005}:3005"
+    volumes:
+      - management-file-storage:${MANAGEMENT_FILE_STORAGE_PATH:-/var/lib/ecmp/management-files}
+      - delivery-file-storage:${DELIVERY_FILE_STORAGE_PATH:-/var/lib/ecmp/delivery-files}
+    depends_on:
+      - mongodb
+      - rabbitmq
+
+  delivery-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/node-app.Dockerfile
+      args:
+        PACKAGE_FILTER: "@ecmp/delivery-service"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3006
+      MONGODB_URI: mongodb://ecmp:ecmp-local@mongodb:27017/ecmp_delivery?authSource=admin
+      FILE_STORAGE_PATH: ${DELIVERY_FILE_STORAGE_PATH:-/var/lib/ecmp/delivery-files}
+    ports:
+      - "${DELIVERY_SERVICE_PORT:-3006}:3006"
+    volumes:
+      - delivery-file-storage:${DELIVERY_FILE_STORAGE_PATH:-/var/lib/ecmp/delivery-files}
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:8
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-ecmp}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-ecmp-local}
+    ports:
+      - "${MONGODB_PORT:-27017}:27017"
+    volumes:
+      - mongodb-data:/data/db
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-ecmp}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-ecmp-local}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+
+volumes:
+  mongodb-data:
+  management-file-storage:
+  delivery-file-storage:

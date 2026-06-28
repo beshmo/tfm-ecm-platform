@@ -1,0 +1,42 @@
+{
+  "name": "ecmp-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Enterprise Content Management Platform monorepo.",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=11.0.0 <12"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r --sort build && pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:unit": "pnpm -r test:unit",
+    "test:frontend": "pnpm --filter @ecmp/management-frontend test",
+    "test:backend": "pnpm --filter \"@ecmp/*-service\" --filter @ecmp/api-gateway --filter @ecmp/publication-worker test",
+    "dev:frontend": "pnpm --filter @ecmp/management-frontend start",
+    "dev:api-gateway": "pnpm --filter @ecmp/api-gateway start:dev",
+    "dev:identity-service": "pnpm --filter @ecmp/identity-service start:dev",
+    "dev:content-service": "pnpm --filter @ecmp/content-service start:dev",
+    "dev:content-type-service": "pnpm --filter @ecmp/content-type-service start:dev",
+    "dev:publication-service": "pnpm --filter @ecmp/publication-service start:dev",
+    "dev:publication-worker": "pnpm --filter @ecmp/publication-worker start:dev",
+    "dev:delivery-service": "pnpm --filter @ecmp/delivery-service start:dev"
+  },
+  "devDependencies": {
+    "@angular/build": "^20.3.0",
+    "@angular/cli": "^20.3.0",
+    "@angular/compiler-cli": "^20.3.0",
+    "@nestjs/testing": "^11.1.0",
+    "@types/node": "^24.0.0",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.4",
+    "tslib": "^2.8.1",
+    "typescript": "~5.9.0",
+    "vite": "^7.0.0",
+    "vitest": "^3.2.4"
+  }
+}

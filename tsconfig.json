@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "references": [
+    { "path": "./packages/shared-types" },
+    { "path": "./packages/shared-events" },
+    { "path": "./packages/shared-auth" },
+    { "path": "./packages/shared-yaml" },
+    { "path": "./services/api-gateway" },
+    { "path": "./services/identity-service" },
+    { "path": "./services/content-service" },
+    { "path": "./services/content-type-service" },
+    { "path": "./services/publication-service" },
+    { "path": "./services/publication-worker" },
+    { "path": "./services/delivery-service" }
+  ]
+}
