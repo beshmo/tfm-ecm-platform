@@ -1873,21 +1873,206 @@ Ingress and gateway rules:
 * The API Gateway performs edge authentication and request routing.
 * Service-to-service traffic remains inside the `ecmp` namespace by default.
 
-## Observability
+## Observability Decisions
 
-Observability is a core requirement.
+Observability is a core requirement. ECMP observability decisions define standards that every service should follow consistently, regardless of language, framework, or deployment target.
 
-Planned capabilities:
+OpenTelemetry is the common instrumentation standard for metrics and distributed tracing.
 
-* Structured JSON logs
-* Correlation IDs
-* Trace IDs
-* Metrics collection
-* Request latency tracking
-* Publication latency tracking
-* RabbitMQ queue depth monitoring
+### Observability Standards
 
-OpenTelemetry is planned for metrics and distributed tracing.
+| Area | Decision | Recommendation |
+| --- | --- | --- |
+| Log format | Structured logging | JSON logs with consistent fields across all services. |
+| Correlation ID propagation | Request context | Generate at ingress if absent, propagate through HTTP headers and messaging metadata, and include in logs, traces, and events. |
+| Metrics naming | Naming convention | Follow OpenTelemetry semantic conventions where possible. Use `<service>_<resource>_<metric>_<unit>` for custom metrics. |
+| Tracing boundaries | What gets traced | Start traces at external entry points and create spans for external calls and significant business operations. |
+| Publication workflow monitoring | Domain-specific telemetry | Track publication stages with metrics, logs, and traces. Measure throughput, failures, queue latency, and end-to-end duration. |
+
+### Log Format
+
+Services must emit structured JSON logs.
+
+Required log fields:
+
+```json
+{
+  "timestamp": "2026-06-01T10:00:00.000Z",
+  "level": "INFO",
+  "service": "publication-service",
+  "environment": "local",
+  "trace_id": "...",
+  "span_id": "...",
+  "correlation_id": "...",
+  "request_id": "...",
+  "user_id": "...",
+  "message": "Publication request created.",
+  "error": null
+}
+```
+
+Logging rules:
+
+* Production logs must be structured JSON.
+* Exceptions must be logged with stack traces where available.
+* Secrets, tokens, passwords, and sensitive personally identifiable information must not be logged.
+* Prefer explicit key-value fields over formatted message strings.
+* Every log emitted during request handling, message processing, or publication workflow execution should include `correlation_id`.
+
+### Correlation ID Propagation
+
+ECMP will standardize on a single correlation identifier for business request tracking.
+
+Initial rules:
+
+* The API Gateway or ingress edge creates `X-Correlation-ID` if the client does not provide one.
+* Downstream services must forward `X-Correlation-ID` unchanged.
+* Message producers must include the correlation ID in message headers or event metadata.
+* Message consumers must continue using the received correlation ID.
+* Logs, traces, audit events, and domain events should include the correlation ID.
+
+Identifier relationship:
+
+| Identifier | Purpose |
+| --- | --- |
+| Correlation ID | Tracks one business request or workflow across services. |
+| Trace ID | Tracks one distributed trace. |
+| Span ID | Tracks one operation inside a trace. |
+
+### Metrics Naming
+
+ECMP metrics should follow OpenTelemetry semantic conventions where possible. Custom metrics should use a consistent snake_case format.
+
+Custom metric format:
+
+```text
+<service>_<resource>_<metric>_<unit>
+```
+
+Examples:
+
+```text
+publication_requests_total
+publication_failures_total
+publication_retries_total
+publication_duration_seconds
+queue_processing_duration_seconds
+database_query_duration_seconds
+queue_depth
+active_publications
+pending_events
+```
+
+Recommended metric labels:
+
+```text
+service
+environment
+workflow
+status
+topic
+region
+```
+
+Avoid high-cardinality labels such as:
+
+* User ID.
+* Content ID.
+* Publication request ID.
+* File ID.
+* Correlation ID.
+
+### Tracing Boundaries
+
+Traces should start at external entry points and asynchronous processing boundaries.
+
+Create traces for:
+
+* Incoming HTTP requests.
+* Message consumption.
+* Scheduled jobs.
+
+Create spans for:
+
+* Business workflow steps.
+* Database queries.
+* External HTTP calls.
+* Cache operations.
+* Message publishing.
+* File storage access.
+
+Do not create spans for trivial helper methods.
+
+Example publication trace:
+
+```text
+Publish Content
+|-- Validate Request
+|-- Load Content
+|-- Build Delivery Projection
+|-- Write Delivery Projection
+|-- Publish Event
+`-- Update Publication Status
+```
+
+### Publication Workflow Monitoring
+
+Publication is a core business workflow and must have domain-specific telemetry.
+
+Business metrics:
+
+* Publications started.
+* Publications completed.
+* Publications failed.
+* Publications retried manually.
+* Unpublications started.
+* Unpublications completed.
+* Unpublications failed.
+
+Latency metrics:
+
+* Validation duration.
+* Processing duration.
+* Queue wait duration.
+* End-to-end publication duration.
+* End-to-end unpublication duration.
+
+Infrastructure metrics:
+
+* RabbitMQ queue depth.
+* Consumer lag.
+* Publication Worker throughput.
+* Error rate.
+
+Tracing rules:
+
+* Each publication or unpublication workflow should have one distributed trace.
+* The trace should include the originating request, event publication, message consumption, Delivery projection update, and final status update.
+
+Structured lifecycle log events:
+
+```text
+PublicationStarted
+ValidationCompleted
+PublicationQueued
+PublicationProjected
+PublicationFailed
+PublicationRetryRequested
+PublicationCompleted
+UnpublicationStarted
+UnpublicationCompleted
+UnpublicationFailed
+```
+
+### Guiding Principles
+
+* Use OpenTelemetry as the common instrumentation standard.
+* Prefer structured logs over free-form text.
+* Ensure every request is traceable through Trace ID and Correlation ID.
+* Instrument business workflows in addition to infrastructure behavior.
+* Keep metric names consistent, low-cardinality, and aligned with semantic conventions where possible.
+* Define dashboards and alerts from service-level indicators and service-level objectives.
+* Focus alerting on error rates, latency, throughput, queue health, and workflow completion.
 
 ## Non-Functional Requirements
 
