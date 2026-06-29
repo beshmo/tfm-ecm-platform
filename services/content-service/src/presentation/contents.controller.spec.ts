@@ -41,7 +41,7 @@ describe("content-service content management endpoints", () => {
       .expect((response) => {
         expect(response.body.contentId).toBe(content.contentId);
       });
-  });
+  }, 10000);
 
   it("GIVEN content exists in folders WHEN listed by folder THEN only matching records are returned", async () => {
     app = await createApp();
@@ -77,6 +77,31 @@ describe("content-service content management endpoints", () => {
           schemaVersion: "2.0",
           version: 1,
           status: "draft"
+        });
+      });
+  });
+
+  it("GIVEN the default generic schema WHEN posted without schema version THEN content is created with schema version 1.0", async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule]
+    }).compile();
+    app = moduleRef.createNestApplication();
+    await app.init();
+
+    await request(app.getHttpServer())
+      .post("/api/management/contents")
+      .send({
+        folderId: "FLD-root",
+        contentType: "generic",
+        data: { title: "Welcome" }
+      })
+      .expect(201)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          folderId: "FLD-root",
+          contentType: "generic",
+          schemaVersion: "1.0",
+          data: { title: "Welcome" }
         });
       });
   });

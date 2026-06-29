@@ -72,6 +72,17 @@ export interface ContentTypeSchemaSummary {
   active: boolean;
 }
 
+export const INITIAL_GENERIC_CONTENT_TYPE_SCHEMA: ContentTypeSchemaDefinition = {
+  name: "generic",
+  version: "1.0",
+  fields: {
+    title: { type: "string", required: true },
+    priority: { type: "integer", required: false },
+    publishDate: { type: "date", required: false },
+    publishTime: { type: "time", required: false }
+  }
+};
+
 export type ContentInstanceData = Record<string, unknown>;
 export type ContentStatus = "draft";
 

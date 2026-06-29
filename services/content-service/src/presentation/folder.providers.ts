@@ -1,4 +1,8 @@
 import {
+  INITIAL_GENERIC_CONTENT_TYPE_SCHEMA,
+  type ContentTypeSchemaDefinition
+} from "@ecmp/shared-types";
+import {
   CreateContentUseCase,
   DeleteContentUseCase,
   GetContentUseCase,
@@ -55,7 +59,8 @@ export const folderProviders = [
   },
   {
     provide: CONTENT_TYPE_SCHEMA_READER,
-    useFactory: (): ContentTypeSchemaReader => new InMemoryContentTypeSchemaReader()
+    useFactory: (): ContentTypeSchemaReader =>
+      new InMemoryContentTypeSchemaReader([cloneSchema(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA)])
   },
   {
     provide: FOLDER_CONTENT_READER,
@@ -144,3 +149,12 @@ export const folderProviders = [
     inject: [CONTENT_REPOSITORY]
   }
 ];
+
+function cloneSchema(schema: ContentTypeSchemaDefinition): ContentTypeSchemaDefinition {
+  return {
+    ...schema,
+    fields: Object.fromEntries(
+      Object.entries(schema.fields).map(([fieldName, field]) => [fieldName, { ...field }])
+    )
+  };
+}

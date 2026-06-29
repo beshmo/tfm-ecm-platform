@@ -22,7 +22,7 @@ import type {
   FolderUpdateInput,
   Permission
 } from "./index";
-import { ROOT_FOLDER_ID } from "./index";
+import { INITIAL_GENERIC_CONTENT_TYPE_SCHEMA, ROOT_FOLDER_ID } from "./index";
 
 describe("shared types", () => {
   it("supports prefixed content IDs and resource permissions", () => {
@@ -101,6 +101,19 @@ describe("shared types", () => {
       name: "generic",
       version: "1.0",
       active: true
+    });
+  });
+
+  it("GIVEN the initial generic schema WHEN shared THEN it exposes the local development seed", () => {
+    expect(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA).toEqual({
+      name: "generic",
+      version: "1.0",
+      fields: {
+        title: { type: "string", required: true },
+        priority: { type: "integer", required: false },
+        publishDate: { type: "date", required: false },
+        publishTime: { type: "time", required: false }
+      }
     });
   });
 

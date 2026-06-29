@@ -22,6 +22,8 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
+      CONTENT_SERVICE_URL: http://content-service:3002
+      CONTENT_TYPE_SERVICE_URL: http://content-type-service:3003
     ports:
       - "${API_GATEWAY_PORT:-3000}:3000"
     depends_on:

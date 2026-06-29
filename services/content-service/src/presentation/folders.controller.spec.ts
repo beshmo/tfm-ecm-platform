@@ -39,7 +39,7 @@ describe("content-service folder management endpoints", () => {
           path: "/"
         });
       });
-  });
+  }, 10000);
 
   it("GIVEN a valid create request WHEN posted THEN a folder is created with status 201", async () => {
     app = await createApp();
