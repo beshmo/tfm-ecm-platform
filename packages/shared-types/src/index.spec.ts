@@ -10,16 +10,61 @@ import type {
   ContentValidationError,
   ContentValidationErrorCode,
   ContentValidationResult,
+  Folder,
+  FolderCreateInput,
+  FolderErrorCode,
+  FolderId,
+  FolderUpdateInput,
   Permission
 } from "./index";
+import { ROOT_FOLDER_ID } from "./index";
 
 describe("shared types", () => {
   it("supports prefixed content IDs and resource permissions", () => {
     const contentId: ContentId = "RCD-123";
+    const folderId: FolderId = "FLD-123";
     const permission: Permission = "folder:read";
 
     expect(contentId).toBe("RCD-123");
+    expect(folderId).toBe("FLD-123");
     expect(permission).toBe("folder:read");
+  });
+
+  it("GIVEN the reserved root folder WHEN shared THEN it exposes nullable parent folder identity", () => {
+    const rootFolder: Folder = {
+      folderId: ROOT_FOLDER_ID,
+      name: "Root",
+      parentFolderId: null,
+      path: "/",
+      createdAt: "2026-06-29T10:00:00.000Z",
+      updatedAt: "2026-06-29T10:00:00.000Z"
+    };
+
+    expect(rootFolder.folderId).toBe("FLD-root");
+    expect(rootFolder.parentFolderId).toBeNull();
+    expect(rootFolder.path).toBe("/");
+  });
+
+  it("GIVEN folder create and update inputs WHEN shared THEN folder management DTO shapes are supported", () => {
+    const createInput: FolderCreateInput = {
+      name: "folder1",
+      parentFolderId: ROOT_FOLDER_ID
+    };
+    const updateInput: FolderUpdateInput = {
+      name: "renamed-folder"
+    };
+    const supportedErrorCodes: FolderErrorCode[] = [
+      "FOLDER_NOT_FOUND",
+      "PARENT_FOLDER_NOT_FOUND",
+      "INVALID_FOLDER_NAME",
+      "DUPLICATE_FOLDER_NAME",
+      "ROOT_FOLDER_OPERATION_NOT_ALLOWED",
+      "FOLDER_NOT_EMPTY"
+    ];
+
+    expect(createInput.parentFolderId).toBe("FLD-root");
+    expect(updateInput.name).toBe("renamed-folder");
+    expect(supportedErrorCodes).toContain("FOLDER_NOT_EMPTY");
   });
 
   it("GIVEN a normalized content type schema WHEN fields are defined THEN simple field types are supported", () => {

@@ -5,6 +5,34 @@ export type FolderId = `FLD-${string}`;
 export type StaticFileId = `STF-${string}`;
 export type UserId = `USR-${string}`;
 
+export const ROOT_FOLDER_ID: FolderId = "FLD-root";
+
+export interface Folder {
+  folderId: FolderId;
+  name: string;
+  parentFolderId: FolderId | null;
+  path: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FolderCreateInput {
+  name: string;
+  parentFolderId: FolderId;
+}
+
+export interface FolderUpdateInput {
+  name: string;
+}
+
+export type FolderErrorCode =
+  | "FOLDER_NOT_FOUND"
+  | "PARENT_FOLDER_NOT_FOUND"
+  | "INVALID_FOLDER_NAME"
+  | "DUPLICATE_FOLDER_NAME"
+  | "ROOT_FOLDER_OPERATION_NOT_ALLOWED"
+  | "FOLDER_NOT_EMPTY";
+
 export type Role = "Admin" | "Creator" | "Reviewer" | "Publisher";
 
 export type PermissionAction = "read" | "create" | "update" | "delete" | "*";
