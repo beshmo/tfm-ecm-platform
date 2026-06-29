@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   compareContentTypeVersions,
+  contentTypeSchemaKey,
   createContentTypeSchemaRecord,
   deactivateContentTypeSchemaRecord,
   toContentTypeSchemaSummary
@@ -23,6 +24,7 @@ describe("content type schema domain", () => {
 
     expect(record.active).toBe(true);
     expect(record.createdAt).toBe(createdAt);
+    expect(record.updatedAt).toBe(createdAt);
     expect(record.definition).toEqual(definition);
   });
 
@@ -34,6 +36,7 @@ describe("content type schema domain", () => {
 
     expect(deactivated.active).toBe(false);
     expect(deactivated.deactivatedAt).toBe(deactivatedAt);
+    expect(deactivated.updatedAt).toBe(deactivatedAt);
     expect(deactivated.definition).toEqual(definition);
   });
 
@@ -50,5 +53,9 @@ describe("content type schema domain", () => {
       version: "1.0",
       active: true
     });
+  });
+
+  it("GIVEN a schema identity WHEN a repository key is created THEN name and version identify the record", () => {
+    expect(contentTypeSchemaKey("generic", "1.0")).toBe("generic:1.0");
   });
 });

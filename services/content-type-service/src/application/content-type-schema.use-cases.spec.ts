@@ -76,6 +76,10 @@ describe("content type schema use cases", () => {
     await expect(
       replaceSchema.execute("generic", "1.0", schemaSource("article", "1.0"))
     ).rejects.toBeInstanceOf(ContentTypeSchemaMismatchError);
+
+    await expect(
+      replaceSchema.execute("generic", "1.0", schemaSource("generic", "2.0"))
+    ).rejects.toBeInstanceOf(ContentTypeSchemaMismatchError);
   });
 
   it("GIVEN a missing schema version WHEN it is replaced THEN it reports not found", async () => {
@@ -130,6 +134,12 @@ describe("content type schema use cases", () => {
     await expect(
       replaceSchema.execute("generic", "1.0", schemaSource("generic", "1.0", "headline"))
     ).rejects.toBeInstanceOf(ContentTypeSchemaInactiveError);
+  });
+
+  it("GIVEN a missing schema version WHEN it is deactivated THEN it reports not found", async () => {
+    await expect(deactivateSchema.execute("generic", "1.0")).rejects.toBeInstanceOf(
+      ContentTypeSchemaNotFoundError
+    );
   });
 
   it("GIVEN a missing schema WHEN it is retrieved THEN it reports not found", async () => {

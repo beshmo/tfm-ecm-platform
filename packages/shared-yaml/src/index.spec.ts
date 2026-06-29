@@ -44,6 +44,8 @@ fields:
       expect((error as SchemaValidationError).issues).toEqual([
         "Schema source must be valid YAML."
       ]);
+      expect((error as SchemaValidationError).issues.join(" ")).not.toContain("node_modules");
+      expect((error as SchemaValidationError).issues.join(" ")).not.toContain("C:\\");
     }
   });
 
@@ -53,7 +55,7 @@ fields:
 name: generic
 version: 1.0
 `)
-    ).toThrow(SchemaValidationError);
+    ).toThrowError(SchemaValidationError);
   });
 
   it("GIVEN a schema without name or version WHEN it is parsed THEN it rejects the required metadata", () => {
@@ -63,7 +65,34 @@ fields:
   title:
     type: string
 `)
-    ).toThrow(SchemaValidationError);
+    ).toThrowError(SchemaValidationError);
+  });
+
+  it("GIVEN invalid fields shapes WHEN they are parsed THEN it rejects the schema", () => {
+    expect(() =>
+      parser.parse(`
+name: generic
+version: 1.0
+fields: []
+`)
+    ).toThrowError(SchemaValidationError);
+
+    expect(() =>
+      parser.parse(`
+name: generic
+version: 1.0
+fields: {}
+`)
+    ).toThrowError(SchemaValidationError);
+
+    expect(() =>
+      parser.parse(`
+name: generic
+version: 1.0
+fields:
+  title: string
+`)
+    ).toThrowError(SchemaValidationError);
   });
 
   it("GIVEN an unsupported field type WHEN it is parsed THEN it rejects the field", () => {
@@ -91,13 +120,50 @@ fields:
     ).toThrow(SchemaValidationError);
   });
 
-  it("GIVEN prototype pollution keys WHEN it is parsed THEN it rejects unsafe keys", () => {
+  it("GIVEN unexpected field keys WHEN it is parsed THEN it rejects the field definition", () => {
     expect(() =>
       parser.parse(`
 name: generic
 version: 1.0
 fields:
-  __proto__:
+  title:
+    type: string
+    description: not allowed
+`)
+    ).toThrow(SchemaValidationError);
+  });
+
+  it("GIVEN prototype pollution keys WHEN it is parsed THEN it rejects unsafe keys", () => {
+    for (const unsafeKey of ["__proto__", "prototype", "constructor"]) {
+      expect(() =>
+        parser.parse(`
+name: generic
+version: 1.0
+fields:
+  ${unsafeKey}:
+    type: string
+`)
+      ).toThrow(SchemaValidationError);
+    }
+  });
+
+  it("GIVEN unsafe field names WHEN they are parsed THEN it rejects identifier-like violations", () => {
+    expect(() =>
+      parser.parse(`
+name: generic
+version: 1.0
+fields:
+  bad-name:
+    type: string
+`)
+    ).toThrow(SchemaValidationError);
+
+    expect(() =>
+      parser.parse(`
+name: generic
+version: 1.0
+fields:
+  "":
     type: string
 `)
     ).toThrow(SchemaValidationError);
@@ -123,14 +189,16 @@ fields:
   });
 
   it("GIVEN an internal platform type name WHEN it is parsed THEN it rejects the reserved name", () => {
-    expect(() =>
-      parser.parse(`
-name: folder
+    for (const reservedName of ["folder", "folders", "static-file", "static-files", "file", "files"]) {
+      expect(() =>
+        parser.parse(`
+name: ${reservedName}
 version: 1.0
 fields:
   title:
     type: string
 `)
-    ).toThrow(SchemaValidationError);
+      ).toThrow(SchemaValidationError);
+    }
   });
 });
