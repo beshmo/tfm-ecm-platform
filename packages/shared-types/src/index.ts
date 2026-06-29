@@ -73,6 +73,40 @@ export interface ContentTypeSchemaSummary {
 }
 
 export type ContentInstanceData = Record<string, unknown>;
+export type ContentStatus = "draft";
+
+export interface ContentRecord {
+  contentId: ContentId;
+  folderId: FolderId;
+  contentType: ContentTypeName;
+  schemaVersion: ContentTypeVersion;
+  version: number;
+  status: ContentStatus;
+  data: ContentInstanceData;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContentCreateInput {
+  folderId: FolderId;
+  contentType: ContentTypeName;
+  schemaVersion?: ContentTypeVersion;
+  data: ContentInstanceData;
+}
+
+export interface ContentReplaceInput {
+  folderId: FolderId;
+  contentType?: ContentTypeName;
+  schemaVersion?: ContentTypeVersion;
+  data: ContentInstanceData;
+}
+
+export interface ContentPatchInput {
+  folderId?: FolderId;
+  contentType?: ContentTypeName;
+  schemaVersion?: ContentTypeVersion;
+  data?: ContentInstanceData;
+}
 
 export type ContentValidationErrorCode =
   | "INVALID_CONTENT_DATA"

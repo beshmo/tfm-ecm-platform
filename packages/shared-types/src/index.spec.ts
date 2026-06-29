@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import type {
+  ContentCreateInput,
   ContentId,
   ContentFieldType,
   ContentInstanceData,
   ContentInstanceValidationInput,
+  ContentPatchInput,
+  ContentRecord,
+  ContentReplaceInput,
+  ContentStatus,
   ContentTypeSchemaDefinition,
   ContentTypeSchemaSummary,
   ContentValidationError,
@@ -138,5 +143,46 @@ describe("shared types", () => {
     };
 
     expect(input.schemaVersion).toBeUndefined();
+  });
+
+  it("GIVEN content record contracts WHEN shared THEN draft content CRUD shapes are supported", () => {
+    const status: ContentStatus = "draft";
+    const record: ContentRecord = {
+      contentId: "RCD-123",
+      folderId: ROOT_FOLDER_ID,
+      contentType: "article",
+      schemaVersion: "1.0",
+      version: 1,
+      status,
+      data: { title: "Welcome" },
+      createdAt: "2026-06-29T10:00:00.000Z",
+      updatedAt: "2026-06-29T10:00:00.000Z"
+    };
+    const createInput: ContentCreateInput = {
+      folderId: ROOT_FOLDER_ID,
+      contentType: "article",
+      data: { title: "Welcome" }
+    };
+    const replaceInput: ContentReplaceInput = {
+      folderId: ROOT_FOLDER_ID,
+      contentType: "article",
+      schemaVersion: "1.0",
+      data: { title: "Updated" }
+    };
+    const patchInput: ContentPatchInput = {
+      data: { title: "Patched" }
+    };
+
+    expect(record).toMatchObject({
+      contentId: "RCD-123",
+      folderId: "FLD-root",
+      contentType: "article",
+      schemaVersion: "1.0",
+      version: 1,
+      status: "draft"
+    });
+    expect(createInput.schemaVersion).toBeUndefined();
+    expect(replaceInput.data["title"]).toBe("Updated");
+    expect(patchInput.data?.["title"]).toBe("Patched");
   });
 });
