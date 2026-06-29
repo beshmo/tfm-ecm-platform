@@ -93,32 +93,50 @@ describe("content instance validation domain", () => {
     expect(result).toEqual({ valid: true, errors: [] });
   });
 
-  it("GIVEN dangerous object keys WHEN validated THEN validation rejects them", () => {
-    const data = JSON.parse('{"title":"Welcome","__proto__":"polluted"}') as unknown;
-
-    const result = validateContentInstanceData(schema, data);
+  it("GIVEN a present optional undefined field WHEN validated THEN validation rejects the field value", () => {
+    const result = validateContentInstanceData(schema, {
+      title: "Welcome",
+      priority: undefined
+    });
 
     expect(result.valid).toBe(false);
     expect(result.errors).toContainEqual({
-      field: "__proto__",
-      code: "FORBIDDEN_FIELD_NAME",
-      message: "__proto__ is not an allowed field name."
+      field: "priority",
+      code: "INVALID_INTEGER",
+      message: "priority must be a whole number."
     });
   });
 
-  it("GIVEN a non-object payload WHEN validated THEN validation rejects the content data", () => {
-    const result = validateContentInstanceData(schema, []);
+  it("GIVEN dangerous object keys WHEN validated THEN validation rejects them", () => {
+    for (const forbiddenKey of ["__proto__", "prototype", "constructor"]) {
+      const data = JSON.parse(`{"title":"Welcome","${forbiddenKey}":"polluted"}`) as unknown;
 
-    expect(result).toEqual({
-      valid: false,
-      errors: [
-        {
-          field: "$",
-          code: "INVALID_CONTENT_DATA",
-          message: "Content data must be a plain object."
-        }
-      ]
-    });
+      const result = validateContentInstanceData(schema, data);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: forbiddenKey,
+        code: "FORBIDDEN_FIELD_NAME",
+        message: `${forbiddenKey} is not an allowed field name.`
+      });
+    }
+  });
+
+  it("GIVEN non-object payloads WHEN validated THEN validation rejects the content data", () => {
+    for (const data of [[], "title", 42, null]) {
+      const result = validateContentInstanceData(schema, data);
+
+      expect(result).toEqual({
+        valid: false,
+        errors: [
+          {
+            field: "$",
+            code: "INVALID_CONTENT_DATA",
+            message: "Content data must be a plain object."
+          }
+        ]
+      });
+    }
   });
 
   it("GIVEN a present optional null field WHEN validated THEN validation rejects the field value", () => {
@@ -133,5 +151,26 @@ describe("content instance validation domain", () => {
       code: "INVALID_INTEGER",
       message: "priority must be a whole number."
     });
+  });
+
+  it("GIVEN invalid date and time formats WHEN validated THEN strict formats are required", () => {
+    const result = validateContentInstanceData(schema, {
+      title: "Welcome",
+      publishDate: "2026-6-28",
+      publishTime: "9:30:00"
+    });
+
+    expect(result.errors).toEqual([
+      {
+        field: "publishDate",
+        code: "INVALID_DATE",
+        message: "publishDate must be a valid date using YYYY-MM-DD format."
+      },
+      {
+        field: "publishTime",
+        code: "INVALID_TIME",
+        message: "publishTime must be a valid time using HH:mm:ss format."
+      }
+    ]);
   });
 });

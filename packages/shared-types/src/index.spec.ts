@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import type {
   ContentId,
   ContentFieldType,
+  ContentInstanceData,
   ContentInstanceValidationInput,
   ContentTypeSchemaDefinition,
   ContentTypeSchemaSummary,
+  ContentValidationError,
+  ContentValidationErrorCode,
   ContentValidationResult,
   Permission
 } from "./index";
@@ -52,22 +55,43 @@ describe("shared types", () => {
   });
 
   it("GIVEN a content validation result WHEN validation fails THEN structured errors describe invalid fields", () => {
+    const supportedErrorCodes: ContentValidationErrorCode[] = [
+      "INVALID_CONTENT_DATA",
+      "REQUIRED_FIELD_MISSING",
+      "UNKNOWN_FIELD",
+      "FORBIDDEN_FIELD_NAME",
+      "INVALID_STRING",
+      "INVALID_INTEGER",
+      "INVALID_DATE",
+      "INVALID_TIME"
+    ];
+    const data: ContentInstanceData = { publishDate: "tomorrow" };
     const input: ContentInstanceValidationInput = {
       contentType: "article",
-      data: { publishDate: "tomorrow" }
+      schemaVersion: "1.0",
+      data
+    };
+    const error: ContentValidationError = {
+      field: "publishDate",
+      code: "INVALID_DATE",
+      message: "publishDate must be a valid date using YYYY-MM-DD format."
     };
     const result: ContentValidationResult = {
       valid: false,
-      errors: [
-        {
-          field: "publishDate",
-          code: "INVALID_DATE",
-          message: "publishDate must be a valid date using YYYY-MM-DD format."
-        }
-      ]
+      errors: [error]
+    };
+
+    expect(input.schemaVersion).toBe("1.0");
+    expect(result.errors[0]?.code).toBe("INVALID_DATE");
+    expect(supportedErrorCodes).toContain("FORBIDDEN_FIELD_NAME");
+  });
+
+  it("GIVEN validation input WHEN schema version is omitted THEN latest schema resolution can be requested", () => {
+    const input: ContentInstanceValidationInput = {
+      contentType: "article",
+      data: { title: "Welcome" }
     };
 
     expect(input.schemaVersion).toBeUndefined();
-    expect(result.errors[0]?.code).toBe("INVALID_DATE");
   });
 });
