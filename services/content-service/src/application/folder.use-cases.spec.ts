@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 import type { FolderContentReader } from "../domain/folder-content.reader";
 import type { FolderIdGenerator } from "../domain/folder-id-generator";
 import { createFolderRecord, createRootFolder } from "../domain/folder";
+import { CompositeFolderContentReader } from "../infrastructure/composite-folder-content.reader";
 import { InMemoryFolderRepository } from "../infrastructure/in-memory-folder.repository";
+import { InMemoryStaticFileRepository } from "../infrastructure/in-memory-static-file.repository";
 import {
   DuplicateFolderNameError,
   FolderNotEmptyError,
@@ -306,6 +308,36 @@ describe("folder use cases", () => {
       new DeleteFolderUseCase(repository, new StaticFolderContentReader(true)).execute(
         folder.folderId
       )
+    ).rejects.toBeInstanceOf(FolderNotEmptyError);
+  });
+
+  it("GIVEN a folder has assigned static files WHEN deleted THEN a non-empty folder error is thrown", async () => {
+    const root = createRootFolder(now);
+    const folder = createFolderRecord({
+      folderId: "FLD-folder1" as FolderId,
+      name: "folder1",
+      parent: root,
+      now
+    });
+    const repository = new InMemoryFolderRepository([root, folder]);
+    const staticFiles = new InMemoryStaticFileRepository([
+      {
+        fileId: "STF-file1",
+        folderId: folder.folderId,
+        filename: "manual.pdf",
+        mimeType: "application/pdf",
+        size: 7,
+        path: "stored/STF-file1.pdf",
+        createdAt: now,
+        updatedAt: now
+      }
+    ]);
+
+    await expect(
+      new DeleteFolderUseCase(
+        repository,
+        new CompositeFolderContentReader(new StaticFolderContentReader(false), staticFiles)
+      ).execute(folder.folderId)
     ).rejects.toBeInstanceOf(FolderNotEmptyError);
   });
 

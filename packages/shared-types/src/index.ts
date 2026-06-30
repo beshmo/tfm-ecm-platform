@@ -145,3 +145,27 @@ export interface ContentInstanceValidationInput {
   schemaVersion?: ContentTypeVersion;
   data: unknown;
 }
+
+export interface StaticFile {
+  fileId: StaticFileId;
+  folderId: FolderId;
+  filename: string;
+  mimeType: string;
+  size: number;
+  path: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StaticFileUpdateInput {
+  filename: string;
+}
+
+export type StaticFileErrorCode =
+  | "STATIC_FILE_NOT_FOUND"
+  | "STATIC_FILE_FOLDER_NOT_FOUND"
+  | "INVALID_STATIC_FILE_NAME"
+  | "MISSING_STATIC_FILE_UPLOAD"
+  | "UNSUPPORTED_STATIC_FILE_MIME_TYPE"
+  | "STATIC_FILE_TOO_LARGE"
+  | "STATIC_FILE_STORAGE_FAILURE";

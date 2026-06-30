@@ -76,6 +76,60 @@ describe("api-gateway management proxy", () => {
     );
   });
 
+  it("GIVEN a file metadata request WHEN proxied THEN it forwards to the Content Service", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, [{ fileId: "STF-1" }]));
+
+    await request(app.getHttpServer())
+      .get("/api/management/files?folderId=FLD-root")
+      .expect(200)
+      .expect([{ fileId: "STF-1" }]);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3002/api/management/files?folderId=FLD-root",
+      expect.objectContaining({ method: "GET" })
+    );
+  });
+
+  it("GIVEN a file metadata mutation WHEN proxied THEN it forwards JSON body", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { fileId: "STF-1", filename: "new.pdf" }));
+
+    await request(app.getHttpServer())
+      .patch("/api/management/files/STF-1")
+      .send({ filename: "new.pdf" })
+      .expect(200)
+      .expect({ fileId: "STF-1", filename: "new.pdf" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3002/api/management/files/STF-1",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ filename: "new.pdf" })
+      })
+    );
+  });
+
+  it("GIVEN a file upload request WHEN proxied THEN it preserves multipart content type", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { fileId: "STF-1" }));
+
+    await request(app.getHttpServer())
+      .post("/api/management/files")
+      .field("folderId", "FLD-root")
+      .attach("file", Buffer.from("content"), {
+        filename: "manual.pdf",
+        contentType: "application/pdf"
+      })
+      .expect(201)
+      .expect({ fileId: "STF-1" });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit & { duplex?: string }];
+    const headers = init.headers as Headers;
+
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeDefined();
+    expect(init.duplex).toBe("half");
+    expect(headers.get("content-type")).toContain("multipart/form-data");
+  });
+
   it("GIVEN a downstream API error WHEN proxied THEN it preserves status and body", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(409, { message: "Conflict" }));
 

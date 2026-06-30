@@ -20,7 +20,11 @@ import type {
   FolderErrorCode,
   FolderId,
   FolderUpdateInput,
-  Permission
+  Permission,
+  StaticFile,
+  StaticFileErrorCode,
+  StaticFileId,
+  StaticFileUpdateInput
 } from "./index";
 import { INITIAL_GENERIC_CONTENT_TYPE_SCHEMA, ROOT_FOLDER_ID } from "./index";
 
@@ -28,10 +32,12 @@ describe("shared types", () => {
   it("supports prefixed content IDs and resource permissions", () => {
     const contentId: ContentId = "RCD-123";
     const folderId: FolderId = "FLD-123";
+    const fileId: StaticFileId = "STF-123";
     const permission: Permission = "folder:read";
 
     expect(contentId).toBe("RCD-123");
     expect(folderId).toBe("FLD-123");
+    expect(fileId).toBe("STF-123");
     expect(permission).toBe("folder:read");
   });
 
@@ -197,5 +203,39 @@ describe("shared types", () => {
     expect(createInput.schemaVersion).toBeUndefined();
     expect(replaceInput.data["title"]).toBe("Updated");
     expect(patchInput.data?.["title"]).toBe("Patched");
+  });
+
+  it("GIVEN static file contracts WHEN shared THEN metadata management shapes are supported", () => {
+    const file: StaticFile = {
+      fileId: "STF-123",
+      folderId: ROOT_FOLDER_ID,
+      filename: "manual.pdf",
+      mimeType: "application/pdf",
+      size: 124500,
+      path: "files/STF-123.pdf",
+      createdAt: "2026-06-29T10:00:00.000Z",
+      updatedAt: "2026-06-29T10:00:00.000Z"
+    };
+    const updateInput: StaticFileUpdateInput = {
+      filename: "manual-v2.pdf"
+    };
+    const supportedErrorCodes: StaticFileErrorCode[] = [
+      "STATIC_FILE_NOT_FOUND",
+      "STATIC_FILE_FOLDER_NOT_FOUND",
+      "INVALID_STATIC_FILE_NAME",
+      "MISSING_STATIC_FILE_UPLOAD",
+      "UNSUPPORTED_STATIC_FILE_MIME_TYPE",
+      "STATIC_FILE_TOO_LARGE",
+      "STATIC_FILE_STORAGE_FAILURE"
+    ];
+
+    expect(file).toMatchObject({
+      fileId: "STF-123",
+      folderId: "FLD-root",
+      filename: "manual.pdf",
+      mimeType: "application/pdf"
+    });
+    expect(updateInput.filename).toBe("manual-v2.pdf");
+    expect(supportedErrorCodes).toContain("STATIC_FILE_STORAGE_FAILURE");
   });
 });

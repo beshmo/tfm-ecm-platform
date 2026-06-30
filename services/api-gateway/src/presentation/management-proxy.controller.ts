@@ -7,7 +7,16 @@ const CONTENT_TYPE_SERVICE_URL =
 
 @Controller("api/management")
 export class ManagementProxyController {
-  @All(["folders", "folders/*path", "contents", "contents/*path", "content-types", "content-types/*path"])
+  @All([
+    "folders",
+    "folders/*path",
+    "contents",
+    "contents/*path",
+    "files",
+    "files/*path",
+    "content-types",
+    "content-types/*path"
+  ])
   async forward(
     @Req() request: IncomingMessage,
     @Res() response: ServerResponse,
@@ -22,11 +31,13 @@ export class ManagementProxyController {
     }
 
     try {
+      const multipart = isMultipartRequest(request);
       const forwardedResponse = await fetch(`${targetBaseUrl}${requestUrl}`, {
         method: request.method,
-        headers: toForwardHeaders(request.headers),
-        body: shouldForwardBody(request.method) ? JSON.stringify(body ?? {}) : undefined
-      });
+        headers: toForwardHeaders(request.headers, !multipart),
+        body: resolveForwardBody(request, body, multipart),
+        ...(multipart ? { duplex: "half" as const } : {})
+      } as RequestInit & { duplex?: "half" });
       const responseBody = await forwardedResponse.text();
       const contentType = forwardedResponse.headers.get("content-type");
 
@@ -52,7 +63,8 @@ function resolveTargetBaseUrl(requestUrl: string): string | null {
 
   if (
     requestUrl.startsWith("/api/management/folders") ||
-    requestUrl.startsWith("/api/management/contents")
+    requestUrl.startsWith("/api/management/contents") ||
+    requestUrl.startsWith("/api/management/files")
   ) {
     return CONTENT_SERVICE_URL;
   }
@@ -60,7 +72,7 @@ function resolveTargetBaseUrl(requestUrl: string): string | null {
   return null;
 }
 
-function toForwardHeaders(headers: IncomingHttpHeaders): Headers {
+function toForwardHeaders(headers: IncomingHttpHeaders, forceJsonContentType: boolean): Headers {
   const forwardedHeaders = new Headers();
 
   for (const [name, value] of Object.entries(headers)) {
@@ -76,13 +88,33 @@ function toForwardHeaders(headers: IncomingHttpHeaders): Headers {
     forwardedHeaders.set(name, value);
   }
 
-  forwardedHeaders.set("content-type", "application/json");
+  if (forceJsonContentType) {
+    forwardedHeaders.set("content-type", "application/json");
+  }
 
   return forwardedHeaders;
 }
 
 function shouldForwardBody(method: string | undefined): boolean {
   return method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
+}
+
+function isMultipartRequest(request: IncomingMessage): boolean {
+  const contentType = request.headers["content-type"];
+
+  return typeof contentType === "string" && contentType.includes("multipart/form-data");
+}
+
+function resolveForwardBody(
+  request: IncomingMessage,
+  body: unknown,
+  multipart: boolean
+): BodyInit | undefined {
+  if (!shouldForwardBody(request.method)) {
+    return undefined;
+  }
+
+  return multipart ? (request as unknown as BodyInit) : JSON.stringify(body ?? {});
 }
 
 function writeJson(

@@ -9,12 +9,14 @@ import type {
   ContentTypeSchemaDefinition,
   ContentTypeSchemaSummary,
   Folder,
-  FolderId
+  FolderId,
+  StaticFile
 } from "@ecmp/shared-types";
 import { ROOT_FOLDER_ID } from "@ecmp/shared-types";
 
 import { ContentTypeApiClient } from "../../content-types/infrastructure/content-type-api.client";
 import { ContentApiClient } from "../../content/infrastructure/content-api.client";
+import { StaticFileApiClient } from "../../content/infrastructure/static-file-api.client";
 import { FolderApiClient } from "../../folders/infrastructure/folder-api.client";
 import type { ApiClientError } from "../../../shared/infrastructure/api-client-error";
 
@@ -38,6 +40,10 @@ type EditorMode = "create" | "edit";
         </div>
         <nav aria-label="Folder explorer actions">
           <button type="button" (click)="openCreate()" [disabled]="loading">New content</button>
+          <input type="file" name="staticFile" (change)="selectUploadFile($event)" />
+          <button type="button" class="secondary" (click)="uploadSelectedFile()" [disabled]="saving">
+            Upload file
+          </button>
         </nav>
       </header>
 
@@ -64,8 +70,8 @@ type EditorMode = "create" | "edit";
 
           <p *ngIf="loading">Loading content...</p>
           <p *ngIf="errorMessage" class="error">{{ errorMessage }}</p>
-          <p *ngIf="!loading && !errorMessage && contents.length === 0" class="empty">
-            This folder has no content records.
+          <p *ngIf="!loading && !errorMessage && contents.length === 0 && files.length === 0" class="empty">
+            This folder has no content records or static files.
           </p>
 
           <table *ngIf="contents.length > 0">
@@ -89,6 +95,41 @@ type EditorMode = "create" | "edit";
                 <td>
                   <button type="button" (click)="openEdit(content)">Edit</button>
                   <button type="button" class="secondary" (click)="confirmDelete(content)">
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="content-header files-header">
+            <h2>Files</h2>
+            <span>{{ files.length }} files</span>
+          </div>
+
+          <p *ngIf="fileErrorMessage" class="error">{{ fileErrorMessage }}</p>
+
+          <table *ngIf="files.length > 0">
+            <thead>
+              <tr>
+                <th>File ID</th>
+                <th>Name</th>
+                <th>MIME type</th>
+                <th>Size</th>
+                <th>Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let file of files">
+                <td>{{ file.fileId }}</td>
+                <td>{{ file.filename }}</td>
+                <td>{{ file.mimeType }}</td>
+                <td>{{ file.size }}</td>
+                <td>{{ file.updatedAt }}</td>
+                <td>
+                  <button type="button" (click)="renameFile(file)">Rename</button>
+                  <button type="button" class="secondary" (click)="confirmDeleteFile(file)">
                     Delete
                   </button>
                 </td>
@@ -228,6 +269,10 @@ type EditorMode = "create" | "edit";
         width: 100%;
       }
 
+      .files-header {
+        margin-top: 1.5rem;
+      }
+
       th,
       td {
         border-bottom: 1px solid #d7dde3;
@@ -290,9 +335,11 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
 
   folders: Folder[] = [];
   contents: ContentRecord[] = [];
+  files: StaticFile[] = [];
   schemas: ContentTypeSchemaSummary[] = [];
   selectedFolderId: FolderId = ROOT_FOLDER_ID;
   selectedFolder: Folder | null = null;
+  selectedUploadFile: File | null = null;
   loading = false;
   saving = false;
   editorOpen = false;
@@ -301,13 +348,15 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
   currentSchema: ContentTypeSchemaDefinition | null = null;
   formData: Record<string, string | number | null> = {};
   errorMessage = "";
+  fileErrorMessage = "";
   formErrorMessage = "";
   validationMessages: string[] = [];
 
   constructor(
     private readonly folderApi: FolderApiClient,
     private readonly contentApi: ContentApiClient,
-    private readonly contentTypeApi: ContentTypeApiClient
+    private readonly contentTypeApi: ContentTypeApiClient,
+    private readonly staticFileApi: StaticFileApiClient
   ) {}
 
   get schemaFields(): SchemaFieldView[] {
@@ -348,13 +397,91 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
     this.selectedFolder = this.folders.find((folder) => folder.folderId === folderId) ?? null;
     this.loading = true;
     this.errorMessage = "";
+    this.fileErrorMessage = "";
 
     try {
-      this.contents = await this.contentApi.listContents(folderId);
+      const [contents, files] = await Promise.all([
+        this.contentApi.listContents(folderId),
+        this.staticFileApi.listFiles(folderId)
+      ]);
+
+      this.contents = contents;
+      this.files = files;
     } catch (error) {
       this.applyPageError(error);
     } finally {
       this.loading = false;
+    }
+  }
+
+  selectUploadFile(event: Event): void {
+    const input = event.target as HTMLInputElement;
+
+    this.selectedUploadFile = input.files?.[0] ?? null;
+    this.fileErrorMessage = "";
+  }
+
+  async uploadSelectedFile(): Promise<void> {
+    if (!this.selectedUploadFile) {
+      this.fileErrorMessage = "Choose a file to upload.";
+      return;
+    }
+
+    this.saving = true;
+    this.fileErrorMessage = "";
+
+    try {
+      await this.staticFileApi.uploadFile(this.selectedFolderId, this.selectedUploadFile);
+      this.selectedUploadFile = null;
+      await this.selectFolder(this.selectedFolderId);
+    } catch (error) {
+      this.applyFileError(error);
+    } finally {
+      this.saving = false;
+    }
+  }
+
+  async renameFile(file: StaticFile): Promise<void> {
+    const filename =
+      typeof globalThis.prompt === "function"
+        ? globalThis.prompt("Rename file", file.filename)
+        : file.filename;
+
+    if (filename === null || filename === file.filename) {
+      return;
+    }
+
+    this.fileErrorMessage = "";
+
+    try {
+      await this.staticFileApi.renameFile(file.fileId, { filename });
+      await this.selectFolder(this.selectedFolderId);
+    } catch (error) {
+      this.applyFileError(error);
+    }
+  }
+
+  async confirmDeleteFile(file: StaticFile): Promise<void> {
+    const confirmed =
+      typeof globalThis.confirm === "function"
+        ? globalThis.confirm(`Delete ${file.filename}?`)
+        : true;
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await this.staticFileApi.deleteFile(file.fileId);
+      this.files = this.files.filter((item) => item.fileId !== file.fileId);
+    } catch (error) {
+      const apiError = error as Partial<ApiClientError>;
+
+      this.applyFileError(error);
+
+      if (apiError.status === 404) {
+        await this.selectFolder(this.selectedFolderId);
+      }
     }
   }
 
@@ -509,6 +636,12 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
 
     this.formErrorMessage = apiError.message ?? "Request failed.";
     this.validationMessages = apiError.validationMessages ?? [];
+  }
+
+  private applyFileError(error: unknown): void {
+    const apiError = error as Partial<ApiClientError>;
+
+    this.fileErrorMessage = apiError.message ?? "Request failed.";
   }
 
   private clearFormErrors(): void {

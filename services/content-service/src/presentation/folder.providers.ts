@@ -10,6 +10,13 @@ import {
   PatchContentUseCase,
   ReplaceContentUseCase
 } from "../application/content.use-cases";
+import {
+  DeleteStaticFileUseCase,
+  GetStaticFileUseCase,
+  ListStaticFilesUseCase,
+  RenameStaticFileUseCase,
+  UploadStaticFileUseCase
+} from "../application/static-file.use-cases";
 import type { ContentIdGenerator } from "../domain/content-id-generator";
 import type { ContentRepository } from "../domain/content.repository";
 import type { ContentTypeSchemaReader } from "../domain/content-type-schema.reader";
@@ -23,6 +30,11 @@ import {
 import type { FolderContentReader } from "../domain/folder-content.reader";
 import type { FolderIdGenerator } from "../domain/folder-id-generator";
 import type { FolderRepository } from "../domain/folder.repository";
+import type { StaticFileIdGenerator } from "../domain/static-file-id-generator";
+import type { StaticFileRepository } from "../domain/static-file.repository";
+import type { StaticFileStorage } from "../domain/static-file.storage";
+import { CompositeFolderContentReader } from "../infrastructure/composite-folder-content.reader";
+import { FilesystemStaticFileStorage } from "../infrastructure/filesystem-static-file.storage";
 import { InMemoryContentTypeSchemaReader } from "../infrastructure/in-memory-content-type-schema.reader";
 import {
   CryptoContentIdGenerator,
@@ -32,6 +44,10 @@ import {
   CryptoFolderIdGenerator,
   InMemoryFolderRepository
 } from "../infrastructure/in-memory-folder.repository";
+import {
+  CryptoStaticFileIdGenerator,
+  InMemoryStaticFileRepository
+} from "../infrastructure/in-memory-static-file.repository";
 
 export const FOLDER_REPOSITORY = Symbol("FOLDER_REPOSITORY");
 export const FOLDER_ID_GENERATOR = Symbol("FOLDER_ID_GENERATOR");
@@ -39,6 +55,9 @@ export const FOLDER_CONTENT_READER = Symbol("FOLDER_CONTENT_READER");
 export const CONTENT_REPOSITORY = Symbol("CONTENT_REPOSITORY");
 export const CONTENT_ID_GENERATOR = Symbol("CONTENT_ID_GENERATOR");
 export const CONTENT_TYPE_SCHEMA_READER = Symbol("CONTENT_TYPE_SCHEMA_READER");
+export const STATIC_FILE_REPOSITORY = Symbol("STATIC_FILE_REPOSITORY");
+export const STATIC_FILE_ID_GENERATOR = Symbol("STATIC_FILE_ID_GENERATOR");
+export const STATIC_FILE_STORAGE = Symbol("STATIC_FILE_STORAGE");
 
 export const folderProviders = [
   {
@@ -58,13 +77,30 @@ export const folderProviders = [
     useClass: CryptoContentIdGenerator
   },
   {
+    provide: STATIC_FILE_REPOSITORY,
+    useFactory: (): StaticFileRepository => new InMemoryStaticFileRepository()
+  },
+  {
+    provide: STATIC_FILE_ID_GENERATOR,
+    useClass: CryptoStaticFileIdGenerator
+  },
+  {
+    provide: STATIC_FILE_STORAGE,
+    useClass: FilesystemStaticFileStorage
+  },
+  {
     provide: CONTENT_TYPE_SCHEMA_READER,
     useFactory: (): ContentTypeSchemaReader =>
       new InMemoryContentTypeSchemaReader([cloneSchema(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA)])
   },
   {
     provide: FOLDER_CONTENT_READER,
-    useExisting: CONTENT_REPOSITORY
+    useFactory: (
+      contentReader: FolderContentReader,
+      staticFileRepository: StaticFileRepository
+    ): FolderContentReader =>
+      new CompositeFolderContentReader(contentReader, staticFileRepository),
+    inject: [CONTENT_REPOSITORY, STATIC_FILE_REPOSITORY]
   },
   {
     provide: ListFoldersUseCase,
@@ -147,6 +183,48 @@ export const folderProviders = [
     useFactory: (repository: ContentRepository): DeleteContentUseCase =>
       new DeleteContentUseCase(repository),
     inject: [CONTENT_REPOSITORY]
+  },
+  {
+    provide: ListStaticFilesUseCase,
+    useFactory: (repository: StaticFileRepository): ListStaticFilesUseCase =>
+      new ListStaticFilesUseCase(repository),
+    inject: [STATIC_FILE_REPOSITORY]
+  },
+  {
+    provide: GetStaticFileUseCase,
+    useFactory: (repository: StaticFileRepository): GetStaticFileUseCase =>
+      new GetStaticFileUseCase(repository),
+    inject: [STATIC_FILE_REPOSITORY]
+  },
+  {
+    provide: UploadStaticFileUseCase,
+    useFactory: (
+      repository: StaticFileRepository,
+      folderRepository: FolderRepository,
+      storage: StaticFileStorage,
+      idGenerator: StaticFileIdGenerator
+    ): UploadStaticFileUseCase =>
+      new UploadStaticFileUseCase(repository, folderRepository, storage, idGenerator),
+    inject: [
+      STATIC_FILE_REPOSITORY,
+      FOLDER_REPOSITORY,
+      STATIC_FILE_STORAGE,
+      STATIC_FILE_ID_GENERATOR
+    ]
+  },
+  {
+    provide: RenameStaticFileUseCase,
+    useFactory: (repository: StaticFileRepository): RenameStaticFileUseCase =>
+      new RenameStaticFileUseCase(repository),
+    inject: [STATIC_FILE_REPOSITORY]
+  },
+  {
+    provide: DeleteStaticFileUseCase,
+    useFactory: (
+      repository: StaticFileRepository,
+      storage: StaticFileStorage
+    ): DeleteStaticFileUseCase => new DeleteStaticFileUseCase(repository, storage),
+    inject: [STATIC_FILE_REPOSITORY, STATIC_FILE_STORAGE]
   }
 ];
 
