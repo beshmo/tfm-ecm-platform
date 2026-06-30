@@ -1,4 +1,5 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { StaticFileStorage, StaticFileStorageSaveInput } from "../domain/static-file.storage";
@@ -17,11 +18,20 @@ export class FilesystemStaticFileStorage implements StaticFileStorage {
 
   async save(input: StaticFileStorageSaveInput): Promise<{ path: string }> {
     await mkdir(this.rootPath, { recursive: true });
+    await mkdir(this.temporaryPath(), { recursive: true });
 
     const storageName = `${input.fileId}${extensionFor(input.mimeType, input.filename)}`;
-    const fullPath = path.join(this.rootPath, storageName);
+    const temporaryName = path.join(".tmp", `${input.fileId}.${randomUUID()}.upload`);
+    const temporaryPath = resolveStoredPath(this.rootPath, temporaryName);
+    const fullPath = resolveStoredPath(this.rootPath, storageName);
 
-    await writeFile(fullPath, input.buffer);
+    try {
+      await writeFile(temporaryPath, input.buffer);
+      await rename(temporaryPath, fullPath);
+    } catch (error) {
+      await cleanupTemporaryFile(temporaryPath);
+      throw error;
+    }
 
     return { path: storageName };
   }
@@ -30,6 +40,10 @@ export class FilesystemStaticFileStorage implements StaticFileStorage {
     const fullPath = resolveStoredPath(this.rootPath, storedPath);
 
     await rm(fullPath, { force: true });
+  }
+
+  private temporaryPath(): string {
+    return path.join(this.rootPath, ".tmp");
   }
 }
 
@@ -54,6 +68,14 @@ function resolveStoredPath(rootPath: string, storedPath: string): string {
   }
 
   return fullPath;
+}
+
+async function cleanupTemporaryFile(temporaryPath: string): Promise<void> {
+  try {
+    await rm(temporaryPath, { force: true });
+  } catch {
+    // Best-effort cleanup should not hide the original filesystem failure.
+  }
 }
 
 function defaultStorageRoot(): string {

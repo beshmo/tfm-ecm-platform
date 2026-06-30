@@ -1092,7 +1092,11 @@ Example:
 
 ### File Metadata Fields
 
-The first implementation stores only minimal file metadata in the Content Service in-memory repository. Binary content is stored in filesystem-backed storage rooted at `STATIC_FILE_STORAGE_ROOT`, defaulting to a local development storage path when the environment variable is not set.
+The first implementation stores only minimal file metadata in the Content Service in-memory repository. Binary content is stored in filesystem-backed storage rooted at `STATIC_FILE_STORAGE_ROOT`, defaulting to `.ecmp-static-files` under the service process working directory when the environment variable is not set.
+
+Filesystem-backed writes use a private `.tmp` directory under the same storage root before moving completed uploads to their generated final storage path. Stored paths remain internal relative paths based on the generated `STF-` ID rather than client-supplied filenames or public URLs.
+
+Because Phase 3 metadata is in-memory while binaries are durable on disk, service restarts can leave orphaned local binary files until the MongoDB metadata persistence slice is added. In local development, these orphaned files can be removed from the configured storage root when resetting the scaffold.
 
 Initial file metadata fields:
 
@@ -1827,6 +1831,8 @@ Initial local filesystem storage:
 | --- | --- |
 | Management file storage | Local directory mounted into services that manage authoring/static file uploads. |
 | Delivery file storage | Local directory mounted into services that serve or project published static files. |
+
+The Content Service uses `STATIC_FILE_STORAGE_ROOT` for Management file storage. Delivery file storage remains separate and is populated only by future publication projection behavior.
 
 ### Kubernetes Deployment Model
 
