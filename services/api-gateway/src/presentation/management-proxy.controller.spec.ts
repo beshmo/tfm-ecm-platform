@@ -76,6 +76,59 @@ describe("api-gateway management proxy", () => {
     );
   });
 
+  it("GIVEN a content type create request WHEN proxied THEN it forwards JSON body to the Content Type Service", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { name: "article", version: "1.0" }));
+
+    await request(app.getHttpServer())
+      .post("/api/management/content-types")
+      .send({ schemaSource: "name: article\nversion: 1.0\nfields: {}" })
+      .expect(201)
+      .expect({ name: "article", version: "1.0" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3003/api/management/content-types",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          schemaSource: "name: article\nversion: 1.0\nfields: {}"
+        })
+      })
+    );
+  });
+
+  it("GIVEN a content type replace request WHEN proxied THEN it forwards method, path, and body", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { name: "article", version: "1.0" }));
+
+    await request(app.getHttpServer())
+      .put("/api/management/content-types/article/versions/1.0")
+      .send({ schemaSource: "name: article\nversion: 1.0\nfields: {}" })
+      .expect(200)
+      .expect({ name: "article", version: "1.0" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3003/api/management/content-types/article/versions/1.0",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({
+          schemaSource: "name: article\nversion: 1.0\nfields: {}"
+        })
+      })
+    );
+  });
+
+  it("GIVEN a content type deactivate request WHEN proxied THEN it forwards method and path", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    await request(app.getHttpServer())
+      .delete("/api/management/content-types/article/versions/1.0")
+      .expect(204);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3003/api/management/content-types/article/versions/1.0",
+      expect.objectContaining({ method: "DELETE" })
+    );
+  });
+
   it("GIVEN a file metadata request WHEN proxied THEN it forwards to the Content Service", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, [{ fileId: "STF-1" }]));
 

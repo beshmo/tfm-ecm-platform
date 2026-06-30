@@ -12,11 +12,20 @@ import {
 import { createContentTypeSchemaRecord } from "../domain/content-type-schema";
 import type { ContentTypeSchemaRepository } from "../domain/content-type-schema.repository";
 import { InMemoryContentTypeSchemaRepository } from "../infrastructure/in-memory-content-type-schema.repository";
+import {
+  loadContentTypeSchemaConfig,
+  type ContentTypeSchemaConfig
+} from "./content-type-schema.config";
 
 export const CONTENT_TYPE_SCHEMA_REPOSITORY = Symbol("CONTENT_TYPE_SCHEMA_REPOSITORY");
 export const SCHEMA_PARSER = Symbol("SCHEMA_PARSER");
+export const CONTENT_TYPE_SCHEMA_CONFIG = Symbol("CONTENT_TYPE_SCHEMA_CONFIG");
 
 export const contentTypeSchemaProviders = [
+  {
+    provide: CONTENT_TYPE_SCHEMA_CONFIG,
+    useFactory: (): ContentTypeSchemaConfig => loadContentTypeSchemaConfig()
+  },
   {
     provide: CONTENT_TYPE_SCHEMA_REPOSITORY,
     useFactory: async (): Promise<ContentTypeSchemaRepository> => {
@@ -29,7 +38,9 @@ export const contentTypeSchemaProviders = [
   },
   {
     provide: SCHEMA_PARSER,
-    useClass: StrictYamlSchemaParser
+    useFactory: (config: ContentTypeSchemaConfig): SchemaParser =>
+      new StrictYamlSchemaParser({ maxSourceBytes: config.maxYamlSourceBytes }),
+    inject: [CONTENT_TYPE_SCHEMA_CONFIG]
   },
   {
     provide: CreateContentTypeSchemaUseCase,

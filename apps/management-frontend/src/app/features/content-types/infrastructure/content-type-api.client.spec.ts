@@ -73,4 +73,101 @@ describe("content type api client", () => {
       validationMessages: []
     });
   });
+
+  it("creates, replaces, and deactivates schemas through gateway URLs", async () => {
+    const http = {
+      post: vi.fn().mockReturnValue(of(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA)),
+      put: vi.fn().mockReturnValue(of(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA)),
+      delete: vi.fn().mockReturnValue(of(undefined))
+    };
+    const client = new ContentTypeApiClient(http as never);
+
+    await expect(client.createSchema("name: generic")).resolves.toEqual(
+      INITIAL_GENERIC_CONTENT_TYPE_SCHEMA
+    );
+    await expect(
+      client.replaceSchemaVersion("article/news" as never, "1.0/beta" as never, "name: article")
+    ).resolves.toEqual(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA);
+    await expect(
+      client.deactivateSchemaVersion("article/news" as never, "1.0/beta" as never)
+    ).resolves.toBeUndefined();
+
+    expect(http.post).toHaveBeenCalledWith("/api/management/content-types", {
+      schemaSource: "name: generic"
+    });
+    expect(http.put).toHaveBeenCalledWith(
+      "/api/management/content-types/article%2Fnews/versions/1.0%2Fbeta",
+      { schemaSource: "name: article" }
+    );
+    expect(http.delete).toHaveBeenCalledWith(
+      "/api/management/content-types/article%2Fnews/versions/1.0%2Fbeta"
+    );
+  });
+
+  it("maps schema write validation errors from Angular HTTP failures", async () => {
+    const http = {
+      post: vi.fn().mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 400,
+              error: {
+                message: "Content type schema is invalid.",
+                errors: [
+                  { message: "Schema source must be valid YAML." },
+                  { message: "Schema must define 'name'." }
+                ]
+              }
+            })
+        )
+      )
+    };
+    const client = new ContentTypeApiClient(http as never);
+
+    await expect(client.createSchema("name: [")).rejects.toMatchObject({
+      status: 400,
+      message: "Content type schema is invalid.",
+      validationMessages: [
+        "Schema source must be valid YAML.",
+        "Schema must define 'name'."
+      ]
+    });
+  });
+
+  it("maps representative schema write conflict and oversized errors", async () => {
+    const http = {
+      put: vi.fn().mockReturnValueOnce(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 409,
+              error: { message: "Content type schema name or version does not match." }
+            })
+        )
+      ),
+      delete: vi.fn().mockReturnValueOnce(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 413,
+              error: { message: "Content type schema source exceeds the maximum allowed size." }
+            })
+        )
+      )
+    };
+    const client = new ContentTypeApiClient(http as never);
+
+    await expect(
+      client.replaceSchemaVersion("generic", "1.0", "name: article")
+    ).rejects.toMatchObject({
+      status: 409,
+      message: "Content type schema name or version does not match.",
+      validationMessages: []
+    });
+    await expect(client.deactivateSchemaVersion("generic", "1.0")).rejects.toMatchObject({
+      status: 413,
+      message: "Content type schema source exceeds the maximum allowed size.",
+      validationMessages: []
+    });
+  });
 });

@@ -8,6 +8,7 @@ describe("management frontend routes", () => {
       "login",
       "folders",
       "folders/:folderId",
+      "content-types",
       "",
       "**"
     ]);

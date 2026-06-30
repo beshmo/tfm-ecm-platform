@@ -109,6 +109,17 @@ describe("folder explorer page component", () => {
     expect(component.editorOpen).toBe(false);
   });
 
+  it("does not reload the current schema when the selected content type has not changed", async () => {
+    const component = createComponent();
+    await component.loadWorkspace(ROOT_FOLDER_ID);
+    await component.openCreate();
+
+    await component.chooseSelectedContentType();
+
+    expect(contentTypeApi.getLatestSchema).toHaveBeenCalledTimes(1);
+    expect(component.selectedContentTypeName).toBe("generic");
+  });
+
   it("edits content with the stored schema version and refreshes the list", async () => {
     const component = createComponent();
     await component.loadWorkspace(ROOT_FOLDER_ID);

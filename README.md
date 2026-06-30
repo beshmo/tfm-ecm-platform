@@ -223,11 +223,19 @@ pnpm test:frontend
 pnpm build
 ```
 
+Runtime configuration:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CONTENT_TYPE_SCHEMA_YAML_MAX_BYTES` | `65536` | Maximum author-facing YAML schema source size accepted by the Content Type Service for schema create and replace requests. |
+
 Run the Angular Management Frontend:
 
 ```bash
 pnpm dev:frontend
 ```
+
+The frontend dev server proxies `/api` requests to the API Gateway. Local shell runs default to `http://localhost:3000`; Docker Compose sets `MANAGEMENT_API_PROXY_TARGET=http://api-gateway:3000` for container-to-container routing. Start the API Gateway and the target backend services before testing API-backed screens.
 
 Run an individual backend service:
 

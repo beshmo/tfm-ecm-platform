@@ -9,6 +9,10 @@ export interface SchemaParser {
   parse(source: string): ContentTypeSchemaDefinition;
 }
 
+export interface StrictYamlSchemaParserOptions {
+  maxSourceBytes?: number;
+}
+
 export class SchemaValidationError extends Error {
   constructor(readonly issues: string[]) {
     super("Content type schema is invalid.");
@@ -16,7 +20,7 @@ export class SchemaValidationError extends Error {
   }
 }
 
-const MAX_SCHEMA_SOURCE_LENGTH = 64 * 1024;
+export const DEFAULT_MAX_SCHEMA_SOURCE_BYTES = 64 * 1024;
 const TOP_LEVEL_KEYS = new Set(["name", "version", "fields"]);
 const FIELD_KEYS = new Set(["type", "required"]);
 const SUPPORTED_FIELD_TYPES = new Set<ContentFieldType>([
@@ -42,10 +46,20 @@ const RESERVED_CONTENT_TYPE_NAMES = new Set([
 const YAML_ANCHOR_OR_ALIAS_PATTERN = /(^|\s)[&*][A-Za-z0-9_-]+/;
 
 export class StrictYamlSchemaParser implements SchemaParser {
+  private readonly maxSourceBytes: number;
+
+  constructor(options: StrictYamlSchemaParserOptions = {}) {
+    this.maxSourceBytes = options.maxSourceBytes ?? DEFAULT_MAX_SCHEMA_SOURCE_BYTES;
+
+    if (!Number.isSafeInteger(this.maxSourceBytes) || this.maxSourceBytes < 1) {
+      throw new RangeError("maxSourceBytes must be a positive safe integer.");
+    }
+  }
+
   parse(source: string): ContentTypeSchemaDefinition {
     const issues: string[] = [];
 
-    if (source.length > MAX_SCHEMA_SOURCE_LENGTH) {
+    if (byteLength(source) > this.maxSourceBytes) {
       throw new SchemaValidationError(["Schema source exceeds the maximum allowed size."]);
     }
 
@@ -104,6 +118,10 @@ export class StrictYamlSchemaParser implements SchemaParser {
       fields
     };
   }
+}
+
+function byteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
 }
 
 function readFields(

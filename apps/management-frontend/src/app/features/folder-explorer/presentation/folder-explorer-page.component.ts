@@ -148,10 +148,11 @@ type EditorMode = "create" | "edit";
         <label *ngIf="editorMode === 'create'">
           Content type
           <select
-            [ngModel]="currentSchema?.name"
-            (ngModelChange)="chooseContentType($event)"
+            [(ngModel)]="selectedContentTypeName"
+            (change)="chooseSelectedContentType()"
             name="contentType"
           >
+            <option value="" disabled>Choose a content type</option>
             <option *ngFor="let schema of schemas" [value]="schema.name">
               {{ schema.name }} {{ schema.version }}
             </option>
@@ -345,6 +346,7 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
   editorOpen = false;
   editorMode: EditorMode = "create";
   editingContent: ContentRecord | null = null;
+  selectedContentTypeName: ContentTypeName | "" = "";
   currentSchema: ContentTypeSchemaDefinition | null = null;
   formData: Record<string, string | number | null> = {};
   errorMessage = "";
@@ -495,6 +497,9 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
     this.editorMode = "create";
     this.editingContent = null;
     this.editorOpen = true;
+    this.currentSchema = null;
+    this.selectedContentTypeName = "";
+    this.formData = {};
     this.clearFormErrors();
 
     try {
@@ -506,13 +511,27 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
         return;
       }
 
+      this.selectedContentTypeName = firstSchema.name;
       await this.chooseContentType(firstSchema.name);
     } catch (error) {
       this.applyFormError(error);
     }
   }
 
+  async chooseSelectedContentType(): Promise<void> {
+    if (!this.selectedContentTypeName) {
+      return;
+    }
+
+    await this.chooseContentType(this.selectedContentTypeName);
+  }
+
   async chooseContentType(contentType: ContentTypeName): Promise<void> {
+    if (this.currentSchema?.name === contentType) {
+      return;
+    }
+
+    this.selectedContentTypeName = contentType;
     this.clearFormErrors();
 
     try {
@@ -527,6 +546,7 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
     this.editorMode = "edit";
     this.editingContent = content;
     this.editorOpen = true;
+    this.selectedContentTypeName = content.contentType;
     this.clearFormErrors();
 
     try {
@@ -544,6 +564,8 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
     this.editorOpen = false;
     this.currentSchema = null;
     this.editingContent = null;
+    this.selectedContentTypeName = "";
+    this.formData = {};
     this.clearFormErrors();
   }
 

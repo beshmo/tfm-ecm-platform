@@ -1,6 +1,7 @@
 import { Routes } from "@angular/router";
 
 import { LoginPageComponent } from "./features/auth/presentation/login-page.component";
+import { ContentTypeSchemasPageComponent } from "./features/content-types/presentation/content-type-schemas-page.component";
 import { FolderExplorerPageComponent } from "./features/folder-explorer/presentation/folder-explorer-page.component";
 
 export const routes: Routes = [
@@ -15,6 +16,10 @@ export const routes: Routes = [
   {
     path: "folders/:folderId",
     component: FolderExplorerPageComponent
+  },
+  {
+    path: "content-types",
+    component: ContentTypeSchemasPageComponent
   },
   {
     path: "",

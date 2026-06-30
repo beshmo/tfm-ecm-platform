@@ -1,7 +1,13 @@
 import { Component } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { provideRouter, Router, RouterOutlet, withComponentInputBinding } from "@angular/router";
-import { ROOT_FOLDER_ID, type ContentRecord, type Folder, type StaticFile } from "@ecmp/shared-types";
+import {
+  INITIAL_GENERIC_CONTENT_TYPE_SCHEMA,
+  ROOT_FOLDER_ID,
+  type ContentRecord,
+  type Folder,
+  type StaticFile
+} from "@ecmp/shared-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ContentTypeApiClient } from "./features/content-types/infrastructure/content-type-api.client";
@@ -32,6 +38,9 @@ describe("management frontend route integration", () => {
     listSchemas: ReturnType<typeof vi.fn>;
     getLatestSchema: ReturnType<typeof vi.fn>;
     getSchemaVersion: ReturnType<typeof vi.fn>;
+    createSchema: ReturnType<typeof vi.fn>;
+    replaceSchemaVersion: ReturnType<typeof vi.fn>;
+    deactivateSchemaVersion: ReturnType<typeof vi.fn>;
   };
   let staticFileApi: {
     listFiles: ReturnType<typeof vi.fn>;
@@ -56,9 +65,12 @@ describe("management frontend route integration", () => {
       deleteContent: vi.fn()
     };
     contentTypeApi = {
-      listSchemas: vi.fn(),
+      listSchemas: vi.fn().mockResolvedValue([{ name: "generic", version: "1.0", active: true }]),
       getLatestSchema: vi.fn(),
-      getSchemaVersion: vi.fn()
+      getSchemaVersion: vi.fn().mockResolvedValue(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA),
+      createSchema: vi.fn(),
+      replaceSchemaVersion: vi.fn(),
+      deactivateSchemaVersion: vi.fn()
     };
     staticFileApi = {
       listFiles: vi.fn((folderId: string) =>
@@ -99,6 +111,16 @@ describe("management frontend route integration", () => {
     expect(pageText(fixture)).toContain("STF-child.pdf");
     expect(contentApi.listContents).toHaveBeenLastCalledWith("FLD-child");
     expect(staticFileApi.listFiles).toHaveBeenLastCalledWith("FLD-child");
+  });
+
+  it("renders the content type schema administration route", async () => {
+    const fixture = await navigateTo("/content-types");
+
+    expect(pageText(fixture)).toContain("Content Type Schemas");
+    expect(pageText(fixture)).toContain("generic");
+    expect(pageText(fixture)).toContain("title");
+    expect(contentTypeApi.listSchemas).toHaveBeenCalled();
+    expect(contentTypeApi.getSchemaVersion).toHaveBeenCalledWith("generic", "1.0");
   });
 
   async function navigateTo(path: string): Promise<ComponentFixture<RouteHostComponent>> {

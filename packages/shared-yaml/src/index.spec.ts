@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { SchemaValidationError, StrictYamlSchemaParser } from "./index";
+import {
+  DEFAULT_MAX_SCHEMA_SOURCE_BYTES,
+  SchemaValidationError,
+  StrictYamlSchemaParser
+} from "./index";
 
 describe("strict YAML schema parser", () => {
   const parser = new StrictYamlSchemaParser();
@@ -186,6 +190,26 @@ fields:
     const oversizedSource = `name: generic\nversion: 1.0\nfields:\n  title:\n    type: string\n${"a".repeat(70 * 1024)}`;
 
     expect(() => parser.parse(oversizedSource)).toThrow(SchemaValidationError);
+  });
+
+  it("GIVEN no parser size option WHEN it is constructed THEN the default source size limit is used", () => {
+    const oversizedSource = `name: generic\nversion: 1.0\nfields:\n  title:\n    type: string\n${"a".repeat(DEFAULT_MAX_SCHEMA_SOURCE_BYTES)}`;
+
+    expect(() => new StrictYamlSchemaParser().parse(oversizedSource)).toThrow(
+      SchemaValidationError
+    );
+  });
+
+  it("GIVEN a configured parser size limit WHEN source exceeds it THEN it rejects before parsing", () => {
+    const configuredParser = new StrictYamlSchemaParser({ maxSourceBytes: 32 });
+
+    expect(() => configuredParser.parse("name: generic\nversion: 1.0\nfields:")).toThrow(
+      SchemaValidationError
+    );
+  });
+
+  it("GIVEN an invalid parser size option WHEN it is constructed THEN it rejects the option", () => {
+    expect(() => new StrictYamlSchemaParser({ maxSourceBytes: 0 })).toThrow(RangeError);
   });
 
   it("GIVEN an internal platform type name WHEN it is parsed THEN it rejects the reserved name", () => {

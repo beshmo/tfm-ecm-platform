@@ -8,6 +8,7 @@ services:
     command: pnpm --filter @ecmp/management-frontend start
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+      MANAGEMENT_API_PROXY_TARGET: http://api-gateway:3000
     ports:
       - "${MANAGEMENT_FRONTEND_PORT:-4200}:4200"
     depends_on:
