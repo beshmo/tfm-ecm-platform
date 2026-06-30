@@ -219,6 +219,7 @@ Run validation checks:
 pnpm typecheck
 pnpm lint
 pnpm test
+pnpm test:frontend
 pnpm build
 ```
 

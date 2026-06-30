@@ -23,9 +23,11 @@
     "zone.js": "^0.15.1"
   },
   "devDependencies": {
+    "@angular/platform-browser-dynamic": "20.3.0",
     "@ecmp/shared-auth": "workspace:*",
     "@ecmp/shared-events": "workspace:*",
     "@ecmp/shared-types": "workspace:*",
-    "@ecmp/shared-yaml": "workspace:*"
+    "@ecmp/shared-yaml": "workspace:*",
+    "jsdom": "^29.1.1"
   }
 }

@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, Input, OnChanges, OnInit, SimpleChanges } from "@angular/core";
+import { Component, Inject, Input, OnChanges, OnInit, SimpleChanges } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import type {
   ContentFieldType,
@@ -353,9 +353,13 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
   validationMessages: string[] = [];
 
   constructor(
+    @Inject(FolderApiClient)
     private readonly folderApi: FolderApiClient,
+    @Inject(ContentApiClient)
     private readonly contentApi: ContentApiClient,
+    @Inject(ContentTypeApiClient)
     private readonly contentTypeApi: ContentTypeApiClient,
+    @Inject(StaticFileApiClient)
     private readonly staticFileApi: StaticFileApiClient
   ) {}
 
@@ -476,11 +480,13 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
       this.files = this.files.filter((item) => item.fileId !== file.fileId);
     } catch (error) {
       const apiError = error as Partial<ApiClientError>;
+      const message = apiError.message ?? "Request failed.";
 
       this.applyFileError(error);
 
       if (apiError.status === 404) {
         await this.selectFolder(this.selectedFolderId);
+        this.fileErrorMessage = message;
       }
     }
   }
@@ -592,11 +598,13 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
       this.contents = this.contents.filter((item) => item.contentId !== content.contentId);
     } catch (error) {
       const apiError = error as Partial<ApiClientError>;
+      const message = apiError.message ?? "Request failed.";
 
       this.applyPageError(error);
 
       if (apiError.status === 404) {
         await this.selectFolder(this.selectedFolderId);
+        this.errorMessage = message;
       }
     }
   }

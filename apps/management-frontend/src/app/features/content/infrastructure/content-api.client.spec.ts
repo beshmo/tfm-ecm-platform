@@ -16,6 +16,33 @@ describe("content api client", () => {
     expect(http.get).toHaveBeenCalledWith("/api/management/contents?folderId=FLD-root");
   });
 
+  it("encodes dynamic content management URLs", async () => {
+    const http = {
+      get: vi.fn().mockReturnValue(of([])),
+      put: vi.fn().mockReturnValue(of({ contentId: "RCD-a/b" })),
+      delete: vi.fn().mockReturnValue(of(undefined))
+    };
+    const client = new ContentApiClient(http as never);
+
+    await client.listContents("FLD-a/b" as never);
+    await client.replaceContent("RCD-a/b" as never, {
+      folderId: ROOT_FOLDER_ID,
+      contentType: "generic",
+      schemaVersion: "1.0",
+      data: {}
+    });
+    await client.deleteContent("RCD-a/b" as never);
+
+    expect(http.get).toHaveBeenCalledWith("/api/management/contents?folderId=FLD-a%2Fb");
+    expect(http.put).toHaveBeenCalledWith("/api/management/contents/RCD-a%2Fb", {
+      folderId: ROOT_FOLDER_ID,
+      contentType: "generic",
+      schemaVersion: "1.0",
+      data: {}
+    });
+    expect(http.delete).toHaveBeenCalledWith("/api/management/contents/RCD-a%2Fb");
+  });
+
   it("creates, replaces, and deletes content through gateway URLs", async () => {
     const http = {
       post: vi.fn().mockReturnValue(of({ contentId: "RCD-1" })),
@@ -78,6 +105,49 @@ describe("content api client", () => {
       status: 400,
       message: "Content data is invalid.",
       validationMessages: ["title must be a string."]
+    });
+  });
+
+  it("maps not-found and conflict errors from Angular HTTP failures", async () => {
+    const http = {
+      put: vi
+        .fn()
+        .mockReturnValueOnce(
+          throwError(
+            () =>
+              new HttpErrorResponse({
+                status: 404,
+                error: { message: "Content record was not found." }
+              })
+          )
+        )
+        .mockReturnValueOnce(
+          throwError(
+            () =>
+              new HttpErrorResponse({
+                status: 409,
+                error: { message: "Content type cannot be changed." }
+              })
+          )
+        )
+    };
+    const client = new ContentApiClient(http as never);
+    const input = {
+      folderId: ROOT_FOLDER_ID,
+      contentType: "generic",
+      schemaVersion: "1.0",
+      data: {}
+    };
+
+    await expect(client.replaceContent("RCD-missing", input)).rejects.toMatchObject({
+      status: 404,
+      message: "Content record was not found.",
+      validationMessages: []
+    });
+    await expect(client.replaceContent("RCD-conflict", input)).rejects.toMatchObject({
+      status: 409,
+      message: "Content type cannot be changed.",
+      validationMessages: []
     });
   });
 });

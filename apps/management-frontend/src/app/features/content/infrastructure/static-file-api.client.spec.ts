@@ -16,6 +16,25 @@ describe("static file api client", () => {
     expect(http.get).toHaveBeenCalledWith("/api/management/files?folderId=FLD-root");
   });
 
+  it("encodes dynamic static file management URLs", async () => {
+    const http = {
+      get: vi.fn().mockReturnValue(of([])),
+      patch: vi.fn().mockReturnValue(of({ fileId: "STF-a/b", filename: "renamed.pdf" })),
+      delete: vi.fn().mockReturnValue(of(undefined))
+    };
+    const client = new StaticFileApiClient(http as never);
+
+    await client.listFiles("FLD-a/b" as never);
+    await client.renameFile("STF-a/b" as never, { filename: "renamed.pdf" });
+    await client.deleteFile("STF-a/b" as never);
+
+    expect(http.get).toHaveBeenCalledWith("/api/management/files?folderId=FLD-a%2Fb");
+    expect(http.patch).toHaveBeenCalledWith("/api/management/files/STF-a%2Fb", {
+      filename: "renamed.pdf"
+    });
+    expect(http.delete).toHaveBeenCalledWith("/api/management/files/STF-a%2Fb");
+  });
+
   it("uploads, renames, and deletes files through gateway URLs", async () => {
     const http = {
       post: vi.fn().mockReturnValue(of({ fileId: "STF-1" })),
@@ -32,6 +51,7 @@ describe("static file api client", () => {
     const formData = http.post.mock.calls[0]?.[1] as FormData;
 
     expect(http.post).toHaveBeenCalledWith("/api/management/files", expect.any(FormData));
+    expect(http.post.mock.calls[0]?.[2]).toBeUndefined();
     expect(formData.get("folderId")).toBe(ROOT_FOLDER_ID);
     expect(formData.get("file")).toBe(file);
     expect(http.patch).toHaveBeenCalledWith("/api/management/files/STF-1", {
@@ -59,6 +79,41 @@ describe("static file api client", () => {
     ).rejects.toMatchObject({
       status: 415,
       message: "Static file MIME type is not supported."
+    });
+  });
+
+  it("maps oversized upload and delete failures from Angular HTTP failures", async () => {
+    const http = {
+      post: vi.fn().mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 413,
+              error: { message: "Static file is too large." }
+            })
+        )
+      ),
+      delete: vi.fn().mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 500,
+              error: { message: "Static file storage failed." }
+            })
+        )
+      )
+    };
+    const client = new StaticFileApiClient(http as never);
+
+    await expect(
+      client.uploadFile(ROOT_FOLDER_ID, new File(["content"], "large.pdf"))
+    ).rejects.toMatchObject({
+      status: 413,
+      message: "Static file is too large."
+    });
+    await expect(client.deleteFile("STF-1")).rejects.toMatchObject({
+      status: 500,
+      message: "Static file storage failed."
     });
   });
 });
