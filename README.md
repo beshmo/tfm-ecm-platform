@@ -26,6 +26,20 @@ The main objectives of ECMP are:
 * Follow cloud-native and Twelve-Factor application principles.
 * Provide a clear academic and professional portfolio case study.
 
+## Object Model
+
+ECMP owns an internal object-type hierarchy, and the CMIS Compatibility API is a standards projection of that model. Every object type descends from an internal `Object Type` root:
+
+```text
+Object Type
+  |-- Folder Type          -> folder instances
+  |-- Document Type        -> binary content (Document) instances
+  `-- Content Type Definition
+       `-- User content types (e.g. generic) -> content record instances
+```
+
+`Document Type` is the domain term for binary content objects with a stored content stream; existing static-file storage and file routes remain as compatibility details. `Content Type Definition` is the common parent of every user-defined content type. See [Architecture](docs/architecture.md) for the full object-type model and its CMIS projection.
+
 ## Documentation
 
 Detailed technical documentation lives in the `docs` directory:

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type {
+  CmisTypeDefinition,
   ContentCreateInput,
   ContentId,
   ContentFieldType,
@@ -30,6 +31,10 @@ import {
   CMIS_REPOSITORY_ID,
   CMIS_SUPPORTED_OPERATIONS,
   CMIS_TYPE_LOCAL_NAMESPACE,
+  ECMP_CONTENT_TYPE_DEFINITION_ID,
+  ECMP_DOCUMENT_TYPE_ID,
+  ECMP_FOLDER_TYPE_ID,
+  ECMP_OBJECT_TYPE_ID,
   INITIAL_GENERIC_CONTENT_TYPE_SCHEMA,
   ROOT_FOLDER_ID,
   cmisBaseTypeDefinitions,
@@ -37,12 +42,33 @@ import {
   cmisObjectFromContentRecord,
   cmisObjectFromFolder,
   cmisObjectFromStaticFile,
+  cmisObjectTypeIdFromEcmpObjectType,
   cmisRepositoryInfo,
   cmisServiceDocument,
   cmisTypeDefinitionFromSchema,
   cmisTypeIdForContentType,
-  contentTypeFromCmisTypeId
+  contentTypeFromCmisTypeId,
+  ecmpBuiltInObjectTypeDefinitions,
+  ecmpObjectTypeFromSchema
 } from "./index";
+
+const COMMON_OBJECT_TYPE_ATTRIBUTES = [
+  "id",
+  "localName",
+  "localNamespace",
+  "queryName",
+  "displayName",
+  "parentId",
+  "description",
+  "creatable",
+  "fileable",
+  "queryable",
+  "controllablePolicy",
+  "controllableACL",
+  "fulltextIndexed",
+  "includedInSupertypeQuery",
+  "typeMutability"
+] as const;
 
 describe("shared types", () => {
   it("supports prefixed content IDs and resource permissions", () => {
@@ -274,6 +300,60 @@ describe("shared types", () => {
     expect(serviceDocument.repositories[CMIS_REPOSITORY_ID]).toEqual(repository);
   });
 
+  it("GIVEN the ECMP object-type model WHEN built-in types are listed THEN the hierarchy descends from Object Type", () => {
+    const builtIns = ecmpBuiltInObjectTypeDefinitions();
+    const byId = new Map(builtIns.map((definition) => [definition.id, definition]));
+
+    expect(builtIns.map((definition) => definition.id)).toEqual([
+      ECMP_OBJECT_TYPE_ID,
+      ECMP_FOLDER_TYPE_ID,
+      ECMP_DOCUMENT_TYPE_ID,
+      ECMP_CONTENT_TYPE_DEFINITION_ID
+    ]);
+    expect(byId.get(ECMP_OBJECT_TYPE_ID)).toMatchObject({ parentId: null });
+    expect(byId.get(ECMP_FOLDER_TYPE_ID)).toMatchObject({ parentId: ECMP_OBJECT_TYPE_ID });
+    expect(byId.get(ECMP_DOCUMENT_TYPE_ID)).toMatchObject({
+      parentId: ECMP_OBJECT_TYPE_ID,
+      displayName: "Document Type"
+    });
+    expect(byId.get(ECMP_CONTENT_TYPE_DEFINITION_ID)).toMatchObject({
+      parentId: ECMP_OBJECT_TYPE_ID
+    });
+  });
+
+  it("GIVEN an ECMP object type WHEN it is returned THEN it exposes every common object-type attribute", () => {
+    const definitions = [
+      ...ecmpBuiltInObjectTypeDefinitions(),
+      ecmpObjectTypeFromSchema(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA)
+    ];
+
+    for (const definition of definitions) {
+      for (const attribute of COMMON_OBJECT_TYPE_ATTRIBUTES) {
+        expect(definition).toHaveProperty(attribute);
+      }
+      expect(definition.typeMutability).toEqual({ create: false, update: false, delete: false });
+    }
+  });
+
+  it("GIVEN a user content type schema WHEN represented as an ECMP object type THEN its parent is Content Type Definition", () => {
+    const generic = ecmpObjectTypeFromSchema(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA);
+
+    expect(generic).toMatchObject({
+      id: "ecmp:generic",
+      parentId: ECMP_CONTENT_TYPE_DEFINITION_ID,
+      baseId: ECMP_OBJECT_TYPE_ID
+    });
+  });
+
+  it("GIVEN ECMP object types WHEN projected to CMIS THEN the internal root is not advertised", () => {
+    expect(cmisObjectTypeIdFromEcmpObjectType(ECMP_OBJECT_TYPE_ID)).toBeNull();
+    expect(cmisObjectTypeIdFromEcmpObjectType(ECMP_FOLDER_TYPE_ID)).toBe("cmis:folder");
+    expect(cmisObjectTypeIdFromEcmpObjectType(ECMP_DOCUMENT_TYPE_ID)).toBe("cmis:document");
+    expect(cmisObjectTypeIdFromEcmpObjectType(ECMP_CONTENT_TYPE_DEFINITION_ID)).toBe(
+      "ecmp:content-type-definition"
+    );
+  });
+
   it("GIVEN ECMP schemas WHEN mapped to CMIS THEN type definitions preserve identity and fields", () => {
     const baseTypes = cmisBaseTypeDefinitions();
     const articleType = cmisTypeDefinitionFromSchema({
@@ -285,13 +365,22 @@ describe("shared types", () => {
       }
     });
 
-    expect(baseTypes.map((type) => type.id)).toEqual(["cmis:folder", "cmis:document", "cmis:item"]);
+    expect(baseTypes.map((type) => type.id)).toEqual([
+      "cmis:folder",
+      "cmis:document",
+      "cmis:item",
+      "ecmp:content-type-definition"
+    ]);
+    expect(baseTypes.find((type) => type.id === "ecmp:content-type-definition")).toMatchObject({
+      baseId: "cmis:item",
+      parentId: "cmis:item"
+    });
     expect(cmisTypeIdForContentType("article")).toBe("ecmp:article");
     expect(contentTypeFromCmisTypeId("ecmp:article")).toBe("article");
     expect(articleType).toMatchObject({
       id: "ecmp:article",
       baseId: "cmis:item",
-      parentId: "cmis:item",
+      parentId: "ecmp:content-type-definition",
       localNamespace: CMIS_TYPE_LOCAL_NAMESPACE,
       contentStreamAllowed: "notallowed"
     });
@@ -313,16 +402,15 @@ describe("shared types", () => {
   });
 
   it("GIVEN any CMIS type definition WHEN returned THEN it exposes the CMIS 1.1 common object-type attributes with conservative flags", () => {
-    const definitions = [
+    const definitions: CmisTypeDefinition[] = [
       ...cmisBaseTypeDefinitions(),
-      cmisTypeDefinitionFromSchema({
-        name: "article",
-        version: "1.0",
-        fields: { title: { type: "string", required: true } }
-      })
+      cmisTypeDefinitionFromSchema(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA)
     ];
 
     for (const definition of definitions) {
+      for (const attribute of [...COMMON_OBJECT_TYPE_ATTRIBUTES, "baseId"]) {
+        expect(definition).toHaveProperty(attribute);
+      }
       expect(definition).toEqual(
         expect.objectContaining({
           id: expect.any(String),
@@ -342,14 +430,27 @@ describe("shared types", () => {
           typeMutability: { create: false, update: false, delete: false }
         })
       );
-      expect(definition).toHaveProperty("parentId");
     }
   });
 
-  it("GIVEN CMIS base types WHEN inspected THEN base type parent identifiers are null", () => {
+  it("GIVEN CMIS base types WHEN inspected THEN only cmis:folder, cmis:document, and cmis:item have a null parent", () => {
     for (const baseType of cmisBaseTypeDefinitions()) {
-      expect(baseType.parentId).toBeNull();
+      if (baseType.id === "ecmp:content-type-definition") {
+        expect(baseType.parentId).toBe("cmis:item");
+      } else {
+        expect(baseType.parentId).toBeNull();
+      }
     }
+  });
+
+  it("GIVEN a user content type WHEN mapped to CMIS THEN parentId is the content type definition", () => {
+    const generic = cmisTypeDefinitionFromSchema(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA);
+
+    expect(generic).toMatchObject({
+      id: "ecmp:generic",
+      baseId: "cmis:item",
+      parentId: "ecmp:content-type-definition"
+    });
   });
 
   it("GIVEN ECMP resources WHEN mapped to CMIS THEN object representations include properties and allowable actions", () => {

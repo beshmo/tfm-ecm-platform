@@ -917,17 +917,40 @@ Content type schemas define:
 * Required fields
 * Extensibility rules
 
+### Object-Type Hierarchy
+
+ECMP owns an internal object-type model. Every object type descends from an internal `Object Type` root that is a platform abstraction and is never exposed as a standalone type to external clients. The CMIS Compatibility API is a standards projection of this model rather than its source of truth.
+
+```text
+Object Type
+  |-- Folder Type
+  |    `-- Folder instance
+  |-- Document Type
+  |    `-- Document instance
+  `-- Content Type Definition
+       |-- Generic Content Type
+       |    `-- Content record instance of Generic
+       `-- Some Other User Content Type
+            `-- Content record instance of Some Other Type
+```
+
+`Document Type` is the object-type/domain name for binary content objects that carry a stored content stream. Existing static-file storage names and `/api/management/files` routes remain as compatibility and storage details; they do not change the `Document` object-type terminology.
+
+`Content Type Definition` is the common parent of every user-defined content type. A user content type such as `generic` is an object-type definition whose parent is `Content Type Definition`. Resource instances always reference a concrete type definition — folder instances reference Folder Type, document instances reference Document Type, and content records reference the user content type selected at creation — never the internal `Object Type` root directly.
+
+Every object-type definition exposes common, CMIS-compatible attributes: `id`, `localName`, `localNamespace`, `queryName`, `displayName`, `baseId`, `parentId`, `description`, `creatable`, `fileable`, `queryable`, `controllablePolicy`, `controllableACL`, `fulltextIndexed`, `includedInSupertypeQuery`, and `typeMutability`. In this slice the unsupported behavior flags (query, policy, ACL, full-text, and type mutability) are set conservatively to `false`.
+
 ### Internal Platform Types
 
 ECMP has internal platform types that are required by the system and are not modeled as user-defined content schemas.
 
-| Type | Description | Extensibility |
-| --- | --- | --- |
-| Folder | Internal type used to group content instances into a hierarchical tree. | Cannot be extended by users. |
-| Static file | Internal type used to represent uploaded binary files and their metadata. | Cannot be extended by users. |
-| Content type | Internal type used to define schemas for content instances. | Users can create new content type schemas as needed. |
+| Type | Object type | Description | Extensibility |
+| --- | --- | --- | --- |
+| Folder | Folder Type | Internal type used to group content instances into a hierarchical tree. | Cannot be extended by users. |
+| Document | Document Type | Internal type used to represent uploaded binary content (static files) and their metadata. | Cannot be extended by users. |
+| Content type | Content Type Definition | Internal parent type used to define schemas for content instances. | Users can create new content type schemas as needed. |
 
-User-defined content types extend the platform by adding schemas for business content, such as articles, landing pages, or product descriptions. They do not extend the internal Folder or Static file types.
+User-defined content types extend the platform by adding schemas for business content, such as articles, landing pages, or product descriptions. They descend from `Content Type Definition` and do not extend the internal Folder or Document types.
 
 ### Supported Field Types
 
@@ -1646,23 +1669,36 @@ REST will be the initial and primary API style. CMIS 1.1 Browser Binding will be
 
 ### CMIS Compatibility API
 
+The compatibility layer targets the OASIS [Content Management Interoperability Services (CMIS) Version 1.1](https://docs.oasis-open.org/cmis/CMIS/v1.1/os/CMIS-v1.1-os.html) standard (OASIS Standard, 2013), specifically its Browser Binding. Type definitions, base types, common object-type attributes, and error codes described below follow the CMIS 1.1 specification.
+
 CMIS support is planned as an adapter over ECMP's native management capabilities. It should expose one management repository first, representing the Management Stage authoring repository.
 
-Initial CMIS mapping:
+CMIS type definitions are projected from the ECMP object-type hierarchy. The internal `Object Type` root is not advertised as a CMIS base type, and the unsupported optional base types (`cmis:relationship`, `cmis:policy`, `cmis:secondary`) are never advertised.
+
+| ECMP object type | CMIS type | CMIS base type | CMIS parent type |
+| --- | --- | --- | --- |
+| Object Type (internal root) | not projected | — | — |
+| Folder Type | `cmis:folder` | `cmis:folder` | none |
+| Document Type | `cmis:document` | `cmis:document` | none |
+| Content Type Definition | `ecmp:content-type-definition` | `cmis:item` | `cmis:item` |
+| User content type (e.g. `generic`) | `ecmp:<name>` (e.g. `ecmp:generic`) | `cmis:item` | `ecmp:content-type-definition` |
+
+Initial CMIS object mapping:
 
 | CMIS concept | ECMP concept |
 | --- | --- |
 | Repository | ECMP Management Stage repository |
-| `cmis:folder` | Folder |
-| `cmis:document` | Static file with binary content stream |
+| `cmis:folder` | Folder instance (Folder Type) |
+| `cmis:document` | Document instance with binary content stream (Document Type, static-file storage) |
 | `cmis:item` | Base object type for structured content records |
-| Custom CMIS type (`ecmp:<name>`) | User-defined content type schema, exposed as a `cmis:item` descendant |
+| `ecmp:content-type-definition` | Content Type Definition, the common parent of user-defined content types |
+| Custom CMIS type (`ecmp:<name>`) | User-defined content type schema, exposed as an `ecmp:content-type-definition` descendant |
 | Object ID | Existing ECMP global ID such as `FLD-*`, `STF-*`, or `RCD-*` |
 | Allowable actions | Existing RBAC permissions and object lifecycle constraints |
 
-Structured content records map to custom object types with `cmis:item` as their base type, so CMIS type discovery advertises `cmis:folder`, `cmis:document`, `cmis:item`, and the active ECMP custom content types. Every returned object-type definition exposes the CMIS 1.1 common object-type attributes (identity, hierarchy, display, behavior flags, indexing flags, and type mutability) with conservative defaults: base types use `parentId: null`, custom content types use `parentId: cmis:item`, and `queryable`, `controllablePolicy`, `controllableACL`, `fulltextIndexed`, `includedInSupertypeQuery`, and all `typeMutability` flags stay `false` while the matching CMIS services are unsupported. The optional base types `cmis:relationship`, `cmis:policy`, and `cmis:secondary` are not advertised until ECMP has backing domain behavior for them.
+Structured content records map to custom object types with `cmis:item` as their base type, so CMIS type discovery advertises `cmis:folder`, `cmis:document`, `cmis:item`, `ecmp:content-type-definition`, and the active ECMP custom content types. Every returned object-type definition exposes the CMIS 1.1 common object-type attributes (identity, hierarchy, display, behavior flags, indexing flags, and type mutability) with conservative defaults: base types use `parentId: null`, `ecmp:content-type-definition` uses `parentId: cmis:item`, custom content types use `parentId: ecmp:content-type-definition`, and `queryable`, `controllablePolicy`, `controllableACL`, `fulltextIndexed`, `includedInSupertypeQuery`, and all `typeMutability` flags stay `false` while the matching CMIS services are unsupported. The optional base types `cmis:relationship`, `cmis:policy`, and `cmis:secondary` are not advertised until ECMP has backing domain behavior for them.
 
-The first CMIS slice should target Browser Binding operations for repository discovery, type discovery, folder children, object lookup by ID, object lookup by path, static file content stream retrieval, folder creation, static-file-backed document creation, and supported object deletion.
+The first CMIS slice should target Browser Binding operations for repository discovery, type discovery, folder children, object lookup by ID, object lookup by path, document content stream retrieval, folder creation, document creation (static-file-backed), and supported object deletion.
 
 Out of scope for the initial CMIS slice:
 

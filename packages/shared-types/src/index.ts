@@ -170,6 +170,110 @@ export type StaticFileErrorCode =
   | "STATIC_FILE_TOO_LARGE"
   | "STATIC_FILE_STORAGE_FAILURE";
 
+// ---------------------------------------------------------------------------
+// ECMP object-type hierarchy
+//
+// ECMP owns an internal object-type model first; CMIS is a standards projection
+// of that model (see `cmis*` helpers below). The internal `Object Type` root is
+// never exposed to CMIS; concrete platform types and user content type
+// definitions descend from it.
+// ---------------------------------------------------------------------------
+
+export const ECMP_OBJECT_TYPE_ID = "ecmp:object";
+export const ECMP_FOLDER_TYPE_ID = "ecmp:folder";
+export const ECMP_DOCUMENT_TYPE_ID = "ecmp:document";
+export const ECMP_CONTENT_TYPE_DEFINITION_ID = "ecmp:content-type-definition";
+
+export const ECMP_OBJECT_TYPE_LOCAL_NAMESPACE = "https://ecmp.tfm/object-types";
+
+export type EcmpBuiltInObjectTypeId =
+  | typeof ECMP_OBJECT_TYPE_ID
+  | typeof ECMP_FOLDER_TYPE_ID
+  | typeof ECMP_DOCUMENT_TYPE_ID
+  | typeof ECMP_CONTENT_TYPE_DEFINITION_ID;
+
+export type EcmpObjectTypeId = EcmpBuiltInObjectTypeId | `ecmp:${string}`;
+
+export interface EcmpTypeMutability {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+}
+
+export interface EcmpObjectTypeDefinition {
+  id: EcmpObjectTypeId;
+  localName: string;
+  localNamespace: string;
+  queryName: string;
+  displayName: string;
+  baseId: EcmpObjectTypeId;
+  parentId: EcmpObjectTypeId | null;
+  description: string;
+  creatable: boolean;
+  fileable: boolean;
+  queryable: boolean;
+  controllablePolicy: boolean;
+  controllableACL: boolean;
+  fulltextIndexed: boolean;
+  includedInSupertypeQuery: boolean;
+  typeMutability: EcmpTypeMutability;
+}
+
+export function ecmpBuiltInObjectTypeDefinitions(): EcmpObjectTypeDefinition[] {
+  return [
+    ecmpObjectTypeDefinition({
+      id: ECMP_OBJECT_TYPE_ID,
+      localName: "object",
+      displayName: "Object Type",
+      description: "Internal ECMP root object type. Not projected to CMIS.",
+      parentId: null,
+      creatable: false,
+      fileable: false
+    }),
+    ecmpObjectTypeDefinition({
+      id: ECMP_FOLDER_TYPE_ID,
+      localName: "folder",
+      displayName: "Folder Type",
+      description: "Groups ECMP objects into a hierarchical tree.",
+      parentId: ECMP_OBJECT_TYPE_ID,
+      creatable: true,
+      fileable: true
+    }),
+    ecmpObjectTypeDefinition({
+      id: ECMP_DOCUMENT_TYPE_ID,
+      localName: "document",
+      displayName: "Document Type",
+      description: "Binary content object backed by a stored content stream.",
+      parentId: ECMP_OBJECT_TYPE_ID,
+      creatable: true,
+      fileable: true
+    }),
+    ecmpObjectTypeDefinition({
+      id: ECMP_CONTENT_TYPE_DEFINITION_ID,
+      localName: "content-type-definition",
+      displayName: "Content Type Definition",
+      description: "Common parent for all user-defined content type definitions.",
+      parentId: ECMP_OBJECT_TYPE_ID,
+      creatable: false,
+      fileable: true
+    })
+  ];
+}
+
+export function ecmpObjectTypeFromSchema(
+  schema: ContentTypeSchemaDefinition
+): EcmpObjectTypeDefinition {
+  return ecmpObjectTypeDefinition({
+    id: `ecmp:${schema.name}`,
+    localName: schema.name,
+    displayName: schema.name,
+    description: `User-defined content type '${schema.name}'.`,
+    parentId: ECMP_CONTENT_TYPE_DEFINITION_ID,
+    creatable: false,
+    fileable: true
+  });
+}
+
 export const CMIS_REPOSITORY_ID = "ecmp-management";
 export const CMIS_ROOT_FOLDER_ID = ROOT_FOLDER_ID;
 
@@ -269,9 +373,9 @@ export interface CmisTypeDefinition {
   controllableACL: boolean;
   fulltextIndexed: boolean;
   includedInSupertypeQuery: boolean;
+  typeMutability: CmisTypeMutability;
   versionable: boolean;
   contentStreamAllowed: "notallowed" | "allowed" | "required";
-  typeMutability: CmisTypeMutability;
   propertyDefinitions: CmisPropertyDefinition[];
 }
 
@@ -367,77 +471,108 @@ export function contentTypeFromCmisTypeId(typeId: CmisObjectTypeId): ContentType
   return typeId.startsWith("ecmp:") ? typeId.slice("ecmp:".length) : null;
 }
 
+/**
+ * Projects an ECMP object-type definition into a CMIS type definition.
+ *
+ * Common object-type attributes (names, descriptions, and conservative
+ * behavior flags) carry over directly from the ECMP model; CMIS-specific
+ * structural attributes (`baseId`, `parentId`, content-stream and property
+ * metadata) are supplied by the caller. The internal `Object Type` root has no
+ * CMIS base type and must not be projected.
+ */
+export function cmisTypeDefinitionFromEcmpObjectType(
+  definition: EcmpObjectTypeDefinition,
+  cmis: {
+    baseId: CmisBaseTypeId;
+    parentId: CmisObjectTypeId | null;
+    localNamespace: string;
+    versionable: boolean;
+    contentStreamAllowed: "notallowed" | "allowed" | "required";
+    propertyDefinitions: CmisPropertyDefinition[];
+  }
+): CmisTypeDefinition {
+  const id = cmisObjectTypeIdFromEcmpObjectType(definition.id);
+
+  if (id === null) {
+    throw new Error(
+      `ECMP object type '${definition.id}' is internal and is not projected to CMIS.`
+    );
+  }
+
+  return {
+    id,
+    localName: definition.localName,
+    localNamespace: cmis.localNamespace,
+    queryName: id,
+    displayName: definition.displayName,
+    baseId: cmis.baseId,
+    parentId: cmis.parentId,
+    description: definition.description,
+    queryable: definition.queryable,
+    creatable: definition.creatable,
+    fileable: definition.fileable,
+    controllablePolicy: definition.controllablePolicy,
+    controllableACL: definition.controllableACL,
+    fulltextIndexed: definition.fulltextIndexed,
+    includedInSupertypeQuery: definition.includedInSupertypeQuery,
+    typeMutability: { ...definition.typeMutability },
+    versionable: cmis.versionable,
+    contentStreamAllowed: cmis.contentStreamAllowed,
+    propertyDefinitions: cmis.propertyDefinitions
+  };
+}
+
 export function cmisBaseTypeDefinitions(): CmisTypeDefinition[] {
+  const builtIns = new Map(
+    ecmpBuiltInObjectTypeDefinitions().map((definition) => [definition.id, definition])
+  );
+
   return [
-    {
-      id: "cmis:folder",
-      localName: "folder",
-      queryName: "cmis:folder",
-      displayName: "Folder",
-      description: "ECMP folder object type.",
+    cmisTypeDefinitionFromEcmpObjectType(requireEcmpObjectType(builtIns, ECMP_FOLDER_TYPE_ID), {
       baseId: "cmis:folder",
       parentId: null,
-      creatable: true,
-      fileable: true,
+      localNamespace: CMIS_CORE_NAMESPACE,
       versionable: false,
       contentStreamAllowed: "notallowed",
-      ...commonTypeAttributes(CMIS_CORE_NAMESPACE),
       propertyDefinitions: commonPropertyDefinitions()
-    },
-    {
-      id: "cmis:document",
-      localName: "document",
-      queryName: "cmis:document",
-      displayName: "Document",
-      description: "ECMP static file document object type.",
+    }),
+    cmisTypeDefinitionFromEcmpObjectType(requireEcmpObjectType(builtIns, ECMP_DOCUMENT_TYPE_ID), {
       baseId: "cmis:document",
       parentId: null,
-      creatable: true,
-      fileable: true,
+      localNamespace: CMIS_CORE_NAMESPACE,
       versionable: false,
       contentStreamAllowed: "required",
-      ...commonTypeAttributes(CMIS_CORE_NAMESPACE),
       propertyDefinitions: [
         ...commonPropertyDefinitions(),
         propertyDefinition("cmis:contentStreamLength", "Content Stream Length", "integer", true),
         propertyDefinition("cmis:contentStreamMimeType", "Content Stream MIME Type", "string", true),
         propertyDefinition("cmis:contentStreamFileName", "Content Stream File Name", "string", true)
       ]
-    },
-    {
-      id: "cmis:item",
-      localName: "item",
-      queryName: "cmis:item",
-      displayName: "Item",
-      description: "ECMP structured content record base object type.",
-      baseId: "cmis:item",
-      parentId: null,
-      creatable: false,
-      fileable: true,
-      versionable: false,
-      contentStreamAllowed: "notallowed",
-      ...commonTypeAttributes(CMIS_CORE_NAMESPACE),
-      propertyDefinitions: commonPropertyDefinitions()
-    }
+    }),
+    cmisItemBaseTypeDefinition(),
+    cmisTypeDefinitionFromEcmpObjectType(
+      requireEcmpObjectType(builtIns, ECMP_CONTENT_TYPE_DEFINITION_ID),
+      {
+        baseId: "cmis:item",
+        parentId: "cmis:item",
+        localNamespace: CMIS_TYPE_LOCAL_NAMESPACE,
+        versionable: false,
+        contentStreamAllowed: "notallowed",
+        propertyDefinitions: commonPropertyDefinitions()
+      }
+    )
   ];
 }
 
 export function cmisTypeDefinitionFromSchema(
   schema: ContentTypeSchemaDefinition
 ): CmisTypeDefinition {
-  return {
-    id: cmisTypeIdForContentType(schema.name),
-    localName: schema.name,
-    queryName: cmisTypeIdForContentType(schema.name),
-    displayName: schema.name,
-    description: `ECMP ${schema.name} content record type.`,
+  return cmisTypeDefinitionFromEcmpObjectType(ecmpObjectTypeFromSchema(schema), {
     baseId: "cmis:item",
-    parentId: "cmis:item",
-    creatable: false,
-    fileable: true,
+    parentId: ECMP_CONTENT_TYPE_DEFINITION_ID,
+    localNamespace: CMIS_TYPE_LOCAL_NAMESPACE,
     versionable: false,
     contentStreamAllowed: "notallowed",
-    ...commonTypeAttributes(CMIS_TYPE_LOCAL_NAMESPACE),
     propertyDefinitions: [
       ...commonPropertyDefinitions(),
       propertyDefinition("ecmp:schemaVersion", "Schema Version", "string", true),
@@ -453,7 +588,7 @@ export function cmisTypeDefinitionFromSchema(
         )
       )
     ]
-  };
+  });
 }
 
 export function cmisObjectFromFolder(
@@ -586,26 +721,89 @@ export function cmisError(exception: CmisErrorCode, message: string): CmisErrorR
   return { exception, message };
 }
 
-function commonTypeAttributes(
-  localNamespace: string
-): Pick<
-  CmisTypeDefinition,
-  | "localNamespace"
-  | "queryable"
-  | "controllablePolicy"
-  | "controllableACL"
-  | "fulltextIndexed"
-  | "includedInSupertypeQuery"
-  | "typeMutability"
-> {
+/**
+ * Maps an ECMP object-type id to its CMIS object-type id, or `null` for the
+ * internal `Object Type` root which is not advertised through CMIS.
+ */
+export function cmisObjectTypeIdFromEcmpObjectType(id: EcmpObjectTypeId): CmisObjectTypeId | null {
+  if (id === ECMP_OBJECT_TYPE_ID) {
+    return null;
+  }
+
+  if (id === ECMP_FOLDER_TYPE_ID) {
+    return "cmis:folder";
+  }
+
+  if (id === ECMP_DOCUMENT_TYPE_ID) {
+    return "cmis:document";
+  }
+
+  return id as CmisObjectTypeId;
+}
+
+function ecmpObjectTypeDefinition(input: {
+  id: EcmpObjectTypeId;
+  localName: string;
+  displayName: string;
+  description: string;
+  parentId: EcmpObjectTypeId | null;
+  creatable: boolean;
+  fileable: boolean;
+}): EcmpObjectTypeDefinition {
   return {
-    localNamespace,
+    id: input.id,
+    localName: input.localName,
+    localNamespace: ECMP_OBJECT_TYPE_LOCAL_NAMESPACE,
+    queryName: input.id,
+    displayName: input.displayName,
+    baseId: ECMP_OBJECT_TYPE_ID,
+    parentId: input.parentId,
+    description: input.description,
+    creatable: input.creatable,
+    fileable: input.fileable,
     queryable: false,
     controllablePolicy: false,
     controllableACL: false,
     fulltextIndexed: false,
     includedInSupertypeQuery: false,
     typeMutability: { create: false, update: false, delete: false }
+  };
+}
+
+function requireEcmpObjectType(
+  definitions: Map<EcmpObjectTypeId, EcmpObjectTypeDefinition>,
+  id: EcmpBuiltInObjectTypeId
+): EcmpObjectTypeDefinition {
+  const definition = definitions.get(id);
+
+  if (!definition) {
+    throw new Error(`Built-in ECMP object type '${id}' is not defined.`);
+  }
+
+  return definition;
+}
+
+function cmisItemBaseTypeDefinition(): CmisTypeDefinition {
+  return {
+    id: "cmis:item",
+    localName: "item",
+    localNamespace: CMIS_CORE_NAMESPACE,
+    queryName: "cmis:item",
+    displayName: "Item",
+    baseId: "cmis:item",
+    parentId: null,
+    description: "CMIS item base type projected from ECMP structured content.",
+    queryable: false,
+    creatable: false,
+    fileable: true,
+    controllablePolicy: false,
+    controllableACL: false,
+    fulltextIndexed: false,
+    includedInSupertypeQuery: false,
+    typeMutability: { create: false, update: false, delete: false },
+    versionable: false,
+    contentStreamAllowed: "notallowed",
+    propertyDefinitions: commonPropertyDefinitions()
   };
 }
 
