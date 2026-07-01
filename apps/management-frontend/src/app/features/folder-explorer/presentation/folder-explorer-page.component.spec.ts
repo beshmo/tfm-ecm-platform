@@ -209,7 +209,7 @@ describe("folder explorer page component", () => {
     expect(component.fileErrorMessage).toBe("Choose a file to upload.");
   });
 
-  it("renames a static file and refreshes the selected folder", async () => {
+  it("renames a document and refreshes the selected folder", async () => {
     const component = createComponent();
     await component.loadWorkspace(ROOT_FOLDER_ID);
     vi.stubGlobal("prompt", vi.fn().mockReturnValue("renamed.pdf"));
@@ -221,7 +221,7 @@ describe("folder explorer page component", () => {
     vi.unstubAllGlobals();
   });
 
-  it("deletes a static file after confirmation", async () => {
+  it("deletes a document after confirmation", async () => {
     const component = createComponent();
     await component.loadWorkspace(ROOT_FOLDER_ID);
     vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
@@ -237,14 +237,14 @@ describe("folder explorer page component", () => {
     const component = createComponent();
     staticFileApi.uploadFile.mockRejectedValueOnce({
       status: 415,
-      message: "Static file MIME type is not supported."
+      message: "Document MIME type is not supported."
     });
     await component.loadWorkspace(ROOT_FOLDER_ID);
 
     component.selectedUploadFile = new File(["content"], "app.exe");
     await component.uploadSelectedFile();
 
-    expect(component.fileErrorMessage).toBe("Static file MIME type is not supported.");
+    expect(component.fileErrorMessage).toBe("Document MIME type is not supported.");
   });
 
   it("keeps form data visible when backend validation fails", async () => {

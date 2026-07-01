@@ -155,7 +155,7 @@ describe("content-service CMIS Browser Binding adapter", () => {
       });
   });
 
-  it("GIVEN a static-file-backed document exists WHEN content stream is requested THEN binary is returned", async () => {
+  it("GIVEN a document-backed object exists WHEN content stream is requested THEN binary is returned", async () => {
     app = await createApp();
     const file = await createDocument("FLD-root");
 

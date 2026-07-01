@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { FilesystemStaticFileStorage } from "./filesystem-static-file.storage";
 
-describe("filesystem static file storage", () => {
+describe("filesystem document storage", () => {
   let rootPath: string;
 
   beforeEach(async () => {
@@ -64,7 +64,7 @@ describe("filesystem static file storage", () => {
     const storage = new FilesystemStaticFileStorage(rootPath);
 
     await expect(storage.delete("../outside.pdf")).rejects.toThrow(
-      "Static file path is outside the storage root."
+      "Document path is outside the storage root."
     );
   });
 
@@ -72,7 +72,7 @@ describe("filesystem static file storage", () => {
     const storage = new FilesystemStaticFileStorage(rootPath);
 
     await expect(storage.read("../outside.pdf")).rejects.toThrow(
-      "Static file path is outside the storage root."
+      "Document path is outside the storage root."
     );
   });
 

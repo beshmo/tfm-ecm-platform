@@ -32,7 +32,7 @@ External systems:
 
 | System | Purpose |
 | --- | --- |
-| MongoDB | Stores structured content, content schemas, publication state, published content, and file metadata. |
+| MongoDB | Stores structured content, content schemas, publication state, published content, and document metadata. |
 | Redis | Stores sessions and cache data. |
 | RabbitMQ | Transports asynchronous publication and unpublication events. |
 | Filesystem-backed storage | Stores binary file content through a configured storage path or mounted volume. |
@@ -139,7 +139,7 @@ Responsibilities:
 * Manage content types where permitted.
 * Browse and manage hierarchical folders.
 * Create, read, update, and delete content instances.
-* Upload and manage static file metadata.
+* Upload and manage document metadata.
 * Request content publication and unpublication.
 * Display content lifecycle status.
 * Surface validation errors from the backend APIs.
@@ -214,7 +214,7 @@ Feature area responsibilities:
 | `content-types` | Content type schema management and schema-driven form support. |
 | `publication` | Publish and unpublish use cases, request status handling, and publication API integration. |
 
-The `folder-explorer` feature coordinates user workflows but does not own the domain rules for folders, content instances, static files, or publication. Those rules remain in the owning business capability feature areas.
+The `folder-explorer` feature coordinates user workflows but does not own the domain rules for folders, content instances, documents, or publication. Those rules remain in the owning business capability feature areas.
 
 Frontend feature boundaries:
 
@@ -244,7 +244,7 @@ Initial screens:
 | Login | Authenticate a user and start a management session. |
 | Folder explorer | Single-page authenticated workspace for browsing folders, viewing content instances, and running management operations. |
 
-The folder explorer should provide a toolbar for the main authoring operations. The first toolbar can include actions for creating folders, renaming folders, deleting folders, creating content instances, updating content instances, deleting or archiving content instances, uploading static files, publishing, and unpublishing.
+The folder explorer should provide a toolbar for the main authoring operations. The first toolbar can include actions for creating folders, renaming folders, deleting folders, creating content instances, updating content instances, deleting or archiving content instances, uploading documents, publishing, and unpublishing.
 
 Folder explorer layout:
 
@@ -252,8 +252,8 @@ Folder explorer layout:
 | --- | --- |
 | Toolbar | Primary create, update, delete, publish, and unpublish actions. |
 | Folder tree | Hierarchical folder navigation starting from the reserved root folder. |
-| Content list | Content instances and static files assigned to the selected folder. |
-| Detail panel or modal | Forms for creating and updating folders, content instances, and static file metadata. |
+| Content list | Content instances and documents assigned to the selected folder. |
+| Detail panel or modal | Forms for creating and updating folders, content instances, and document metadata. |
 | Status area | Validation errors, lifecycle state, publication status, and operation feedback. |
 
 Initial user workflows:
@@ -273,7 +273,7 @@ The first implementation should avoid deep navigation. Content editing, folder e
 
 ## Security Model
 
-The initial security model is role-based and permission-driven. It starts with a small set of roles and resource actions that are enough for the Management Frontend, folder explorer, content CRUD, static file management, and publication workflow.
+The initial security model is role-based and permission-driven. It starts with a small set of roles and resource actions that are enough for the Management Frontend, folder explorer, content CRUD, document management, and publication workflow.
 
 ### Roles
 
@@ -296,7 +296,7 @@ Initial resources:
 | --- | --- |
 | `explorer` | Management Frontend folder explorer workspace access. |
 | `folder` | Folder hierarchy operations. |
-| `file` | Static file metadata and binary file operations. |
+| `file` | Document metadata and binary file operations. |
 | `<contentTypeName>` | Content instance operations for a specific user-defined content type, such as `generic:read`. |
 | `workflow` | Publication and unpublication workflow operations. |
 | `content-type` | Content type schema administration. |
@@ -498,7 +498,7 @@ Each service owns a specific part of the domain model and should expose that own
 | --- | --- |
 | Identity Service | Authentication, authorization, sessions, users, and role assignments. |
 | Content Type Service | Content type schemas and schema validation rules. |
-| Content Service | Content drafts, master records, folder hierarchy, content lifecycle state, and file metadata. |
+| Content Service | Content drafts, master records, folder hierarchy, content lifecycle state, and document metadata. |
 | Publication Service | Publication and unpublication requests, publication state, and publication events. |
 | Publication Worker | Execution of publication and unpublication events between Management and Delivery stages. |
 | Delivery Service | Published read model access and internal delivery queries. |
@@ -645,7 +645,7 @@ Initial create/update payload shape:
 }
 ```
 
-#### File Metadata Upload and Update
+#### Document Metadata Upload and Update
 
 Owned by the Content Service.
 
@@ -653,11 +653,11 @@ The binary file is stored in filesystem-backed storage. The first implementation
 
 | Method | Endpoint | Permission | Description |
 | --- | --- | --- | --- |
-| `GET` | `/api/management/files?folderId={folderId}` | `file:read` | List file metadata assigned to a folder. |
-| `POST` | `/api/management/files` | `file:create` | Upload a binary file and create file metadata using multipart fields `folderId` and `file`. |
-| `GET` | `/api/management/files/{fileId}` | `file:read` | Retrieve file metadata by ID. |
-| `PATCH` | `/api/management/files/{fileId}` | `file:update` | Update file metadata. |
-| `DELETE` | `/api/management/files/{fileId}` | `file:delete` | Delete or archive file metadata and the associated binary file according to lifecycle rules. |
+| `GET` | `/api/management/files?folderId={folderId}` | `file:read` | List document metadata assigned to a folder. |
+| `POST` | `/api/management/files` | `file:create` | Upload a binary document and create document metadata using multipart fields `folderId` and `file`. |
+| `GET` | `/api/management/files/{fileId}` | `file:read` | Retrieve document metadata by ID. |
+| `PATCH` | `/api/management/files/{fileId}` | `file:update` | Update document metadata. |
+| `DELETE` | `/api/management/files/{fileId}` | `file:delete` | Delete or archive document metadata and the associated binary file according to lifecycle rules. |
 
 Initial metadata response shape:
 
@@ -788,7 +788,7 @@ Storage:
 
 ### Content Service
 
-Manages content instances, folders, and static file metadata.
+Manages content instances, folders, and document metadata.
 
 Ownership:
 
@@ -796,7 +796,7 @@ Ownership:
 * Master content records
 * Folder hierarchy
 * Content lifecycle state
-* File metadata
+* Document metadata
 
 Responsibilities:
 
@@ -934,7 +934,7 @@ Object Type
             `-- Content record instance of Some Other Type
 ```
 
-`Document Type` is the object-type/domain name for binary content objects that carry a stored content stream. Existing static-file storage names and `/api/management/files` routes remain as compatibility and storage details; they do not change the `Document` object-type terminology.
+`Document Type` is the object-type/domain name for binary content objects that carry a stored content stream. Existing file storage names and `/api/management/files` routes remain as compatibility and storage details; they do not change the `Document` object-type terminology.
 
 `Content Type Definition` is the common parent of every user-defined content type. A user content type such as `generic` is an object-type definition whose parent is `Content Type Definition`. Resource instances always reference a concrete type definition — folder instances reference Folder Type, document instances reference Document Type, and content records reference the user content type selected at creation — never the internal `Object Type` root directly.
 
@@ -947,7 +947,7 @@ ECMP has internal platform types that are required by the system and are not mod
 | Type | Object type | Description | Extensibility |
 | --- | --- | --- | --- |
 | Folder | Folder Type | Internal type used to group content instances into a hierarchical tree. | Cannot be extended by users. |
-| Document | Document Type | Internal type used to represent uploaded binary content (static files) and their metadata. | Cannot be extended by users. |
+| Document | Document Type | Internal type used to represent uploaded binary content and its metadata. | Cannot be extended by users. |
 | Content type | Content Type Definition | Internal parent type used to define schemas for content instances. | Users can create new content type schemas as needed. |
 
 User-defined content types extend the platform by adding schemas for business content, such as articles, landing pages, or product descriptions. They descend from `Content Type Definition` and do not extend the internal Folder or Document types.
@@ -1017,7 +1017,7 @@ In this example, `title` is required and `description` is optional.
 
 ### Global ID Strategy
 
-Content records, folders, and static files will use globally unique identifiers generated by the platform.
+Content records, folders, and documents will use globally unique identifiers generated by the platform.
 
 Initial rules:
 
@@ -1028,7 +1028,7 @@ Initial rules:
 * UUID v4 is the initial recommended value for the global ID suffix.
 * Content instance IDs use the `RCD-` prefix.
 * Folder IDs use the `FLD-` prefix.
-* Static file IDs use the `STF-` prefix.
+* Document IDs use the `STF-` compatibility prefix.
 * The root folder `/` has a reserved folder ID.
 
 Example:
@@ -1121,26 +1121,26 @@ Example:
 }
 ```
 
-### File Metadata Fields
+### Document Metadata Fields
 
-The first implementation stores only minimal file metadata in the Content Service in-memory repository. Binary content is stored in filesystem-backed storage rooted at `STATIC_FILE_STORAGE_ROOT`, defaulting to `.ecmp-static-files` under the service process working directory when the environment variable is not set.
+The first implementation stores only minimal document metadata in the Content Service in-memory repository. Binary content is stored in filesystem-backed storage rooted at `STATIC_FILE_STORAGE_ROOT`, defaulting to `.ecmp-static-files` under the service process working directory when the environment variable is not set.
 
 Filesystem-backed writes use a private `.tmp` directory under the same storage root before moving completed uploads to their generated final storage path. Stored paths remain internal relative paths based on the generated `STF-` ID rather than client-supplied filenames or public URLs.
 
 Because Phase 3 metadata is in-memory while binaries are durable on disk, service restarts can leave orphaned local binary files until the MongoDB metadata persistence slice is added. In local development, these orphaned files can be removed from the configured storage root when resetting the scaffold.
 
-Initial file metadata fields:
+Initial document metadata fields:
 
 | Field | Description |
 | --- | --- |
-| `fileId` | Globally unique static file identifier generated by the platform, using the `STF-` prefix. |
-| `folderId` | Folder that contains the static file, using the `FLD-` prefix. |
+| `fileId` | Globally unique document identifier generated by the platform, using the `STF-` compatibility prefix. |
+| `folderId` | Folder that contains the document, using the `FLD-` prefix. |
 | `filename` | Original or normalized file name. |
 | `mimeType` | MIME type detected or provided during upload. |
 | `size` | File size in bytes. |
 | `path` | Internal filesystem-backed storage path. |
-| `createdAt` | UTC timestamp when the file metadata was created. |
-| `updatedAt` | UTC timestamp when the file metadata was last updated. |
+| `createdAt` | UTC timestamp when the document metadata was created. |
+| `updatedAt` | UTC timestamp when the document metadata was last updated. |
 
 Example:
 
@@ -1183,9 +1183,9 @@ description: First article
 publishDate: 2026-06-01
 ```
 
-### Static File Type
+### Document Type
 
-Static file is an internal platform type used to represent binary assets. The binary file will be stored in a configured filesystem-backed storage location, while the first implementation stores metadata in the Content Service in-memory repository. Users cannot extend the Static file type.
+Document is an internal platform type used to represent binary assets. The binary file will be stored in a configured filesystem-backed storage location, while the first implementation stores metadata in the Content Service in-memory repository. Users cannot extend the Document type.
 
 Example use cases:
 
@@ -1199,7 +1199,7 @@ Example metadata:
 ```yaml
 id: STF-550e8400-e29b-41d4-a716-446655440002
 folderId: FLD-root
-type: static-file
+type: document
 filename: manual.pdf
 mimeType: application/pdf
 size: 124500
@@ -1579,8 +1579,8 @@ Payload fields may be refined when the publication retry strategy, failure handl
 | Content type schemas | Management MongoDB database |
 | Folder metadata | Management MongoDB database |
 | Folder metadata | Delivery MongoDB database, when folder information is projected for internal delivery queries |
-| File metadata | Content Service in-memory repository for the Phase 3 scaffold; Management MongoDB database in a later persistence slice |
-| File metadata | Delivery MongoDB database only when static files are projected in a future delivery slice |
+| Document metadata | Content Service in-memory repository for the Phase 3 scaffold; Management MongoDB database in a later persistence slice |
+| Document metadata | Delivery MongoDB database only when documents are projected in a future delivery slice |
 | Binary files | Management Filesystem-backed storage path or mounted volume |
 | Binary files | Delivery Filesystem-backed storage path or mounted volume |
 | Sessions | Redis |
@@ -1630,7 +1630,7 @@ Management and Delivery data must not share the same MongoDB collections. The mi
 }
 ```
 
-### File Metadata
+### Document Metadata
 
 ```json
 {
@@ -1689,7 +1689,7 @@ Initial CMIS object mapping:
 | --- | --- |
 | Repository | ECMP Management Stage repository |
 | `cmis:folder` | Folder instance (Folder Type) |
-| `cmis:document` | Document instance with binary content stream (Document Type, static-file storage) |
+| `cmis:document` | Document instance with binary content stream (Document Type, file storage) |
 | `cmis:item` | Base object type for structured content records |
 | `ecmp:content-type-definition` | Content Type Definition, the common parent of user-defined content types |
 | Custom CMIS type (`ecmp:<name>`) | User-defined content type schema, exposed as an `ecmp:content-type-definition` descendant |
@@ -1698,7 +1698,7 @@ Initial CMIS object mapping:
 
 Structured content records map to custom object types with `cmis:item` as their base type, so CMIS type discovery advertises `cmis:folder`, `cmis:document`, `cmis:item`, `ecmp:content-type-definition`, and the active ECMP custom content types. Every returned object-type definition exposes the CMIS 1.1 common object-type attributes (identity, hierarchy, display, behavior flags, indexing flags, and type mutability) with conservative defaults: base types use `parentId: null`, `ecmp:content-type-definition` uses `parentId: cmis:item`, custom content types use `parentId: ecmp:content-type-definition`, and `queryable`, `controllablePolicy`, `controllableACL`, `fulltextIndexed`, `includedInSupertypeQuery`, and all `typeMutability` flags stay `false` while the matching CMIS services are unsupported. The optional base types `cmis:relationship`, `cmis:policy`, and `cmis:secondary` are not advertised until ECMP has backing domain behavior for them.
 
-The first CMIS slice should target Browser Binding operations for repository discovery, type discovery, folder children, object lookup by ID, object lookup by path, document content stream retrieval, folder creation, document creation (static-file-backed), and supported object deletion.
+The first CMIS slice should target Browser Binding operations for repository discovery, type discovery, folder children, object lookup by ID, object lookup by path, document content stream retrieval, folder creation, document creation (document-backed), and supported object deletion.
 
 Out of scope for the initial CMIS slice:
 
@@ -1786,7 +1786,7 @@ Minimum expected tests per layer:
 | Layer | Minimum target | Scope |
 | --- | --- | --- |
 | Domain unit tests | 100% | Entities, value objects, validation rules, content lifecycle rules, folder rules, ID rules, and publication domain rules. |
-| Application use case tests | 100% | Use cases such as creating folders, updating content instances, deleting records, uploading file metadata, publishing, unpublishing, login, and token refresh. |
+| Application use case tests | 100% | Use cases such as creating folders, updating content instances, deleting records, uploading document metadata, publishing, unpublishing, login, and token refresh. |
 | Service integration tests | 30% | Service behavior with real or test infrastructure dependencies such as MongoDB, Redis, RabbitMQ, and filesystem-backed storage. |
 | API contract tests | 100% | REST and CMIS request and response contracts, status codes, authentication requirements, authorization requirements, and error shapes. |
 | Angular component/integration tests | 20% | Components, forms, route guards, frontend use case integration, API client mapping, and folder explorer interactions. |
@@ -1826,7 +1826,7 @@ Initial Playwright E2E workflows should include:
 * Login and redirect to the folder explorer.
 * Create, update, and delete a folder.
 * Create, update, and delete a content instance.
-* Upload static file metadata.
+* Upload document metadata.
 * Publish a content instance.
 * Unpublish a content instance.
 
@@ -1903,8 +1903,8 @@ Initial local filesystem storage:
 
 | Storage area | Local mount intent |
 | --- | --- |
-| Management file storage | Local directory mounted into services that manage authoring/static file uploads. |
-| Delivery file storage | Local directory mounted into services that serve or project published static files. |
+| Management file storage | Local directory mounted into services that manage authoring document uploads. |
+| Delivery file storage | Local directory mounted into services that serve or project published documents. |
 
 The Content Service uses `STATIC_FILE_STORAGE_ROOT` for Management file storage. Delivery file storage remains separate and is populated only by future publication projection behavior.
 
@@ -1979,7 +1979,7 @@ Initial persistent volume plan:
 Initial rules:
 
 * Management and Delivery file storage must use separate persistent volumes and claims.
-* Management file storage is the source for authoring/static file uploads.
+* Management file storage is the source for authoring document uploads.
 * Delivery file storage contains published file projections for internal delivery access.
 * The Publication Worker is responsible for moving or projecting published file data from Management storage to Delivery storage according to the publication workflow.
 * Storage classes, access modes, and capacity values will be selected during implementation based on the local cluster or target Kubernetes environment.

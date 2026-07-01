@@ -81,7 +81,7 @@ Angular frontend feature areas (`apps/management-frontend/src/app/features/*`): 
 | --- | --- |
 | identity-service | Auth, sessions, users, roles (Redis-backed) |
 | content-type-service | Content type YAML schemas + validation rules (MongoDB) |
-| content-service | Content drafts/master records, folder hierarchy, lifecycle state, file metadata (MongoDB + filesystem storage) |
+| content-service | Content drafts/master records, folder hierarchy, lifecycle state, document metadata (MongoDB + filesystem storage) |
 | publication-service | Publication/unpublication requests and state (MongoDB + RabbitMQ) |
 | publication-worker | Consumes RabbitMQ events, projects/removes content between Management and Delivery MongoDB |
 | delivery-service | Read-only published content API (Delivery MongoDB) |
@@ -95,7 +95,7 @@ Management and Delivery data are separate MongoDB databases (`ecmp_management` /
 
 ### Content model
 
-Content types are YAML schemas (`docs/architecture.md` "Content Model") validated against a small fixed set of field types (`string`, `integer`, `date`, `time`). Folder, Static file, and Content type are internal platform types that cannot be extended by users; all other content types are user-defined. Global IDs are prefixed (`RCD-`, `FLD-`, `STF-`), UUIDv4-based, generated server-side; the root folder uses the reserved ID `FLD-root`.
+Content types are YAML schemas (`docs/architecture.md` "Content Model") validated against a small fixed set of field types (`string`, `integer`, `date`, `time`). Folder, Document, and Content type are internal platform types that cannot be extended by users; all other content types are user-defined. Global IDs are prefixed (`RCD-`, `FLD-`, `STF-`), UUIDv4-based, generated server-side; the root folder uses the reserved ID `FLD-root`.
 
 ### Auth model
 

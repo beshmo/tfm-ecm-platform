@@ -78,7 +78,7 @@ export class FilesController {
   @Get()
   async list(@Query("folderId") folderId?: string): Promise<StaticFile[]> {
     if (typeof folderId !== "string" || folderId.length === 0) {
-      throw new BadRequestException("Static file list requires folderId.");
+      throw new BadRequestException("Document list requires folderId.");
     }
 
     try {
@@ -106,7 +106,7 @@ export class FilesController {
     @UploadedFile() file?: UploadedStaticFile
   ): Promise<StaticFile> {
     if (typeof folderId !== "string" || folderId.length === 0) {
-      throw new BadRequestException("Static file upload requires folderId.");
+      throw new BadRequestException("Document upload requires folderId.");
     }
 
     try {
@@ -155,7 +155,7 @@ export class FilesController {
 
 function parseUpdateInput(body: unknown): StaticFileUpdateInput {
   if (!isPlainObject(body) || typeof body["filename"] !== "string") {
-    throw new BadRequestException("Static file update request requires filename.");
+    throw new BadRequestException("Document update request requires filename.");
   }
 
   return { filename: body["filename"] };
@@ -219,5 +219,5 @@ function mapStaticFileError(error: unknown): Error {
     return error;
   }
 
-  return new Error("Unknown static file error.");
+  return new Error("Unknown document error.");
 }

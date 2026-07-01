@@ -247,7 +247,7 @@ describe("shared types", () => {
     expect(patchInput.data?.["title"]).toBe("Patched");
   });
 
-  it("GIVEN static file contracts WHEN shared THEN metadata management shapes are supported", () => {
+  it("GIVEN document contracts WHEN shared THEN metadata management shapes are supported", () => {
     const file: StaticFile = {
       fileId: "STF-123",
       folderId: ROOT_FOLDER_ID,

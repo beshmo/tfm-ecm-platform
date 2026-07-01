@@ -8,7 +8,7 @@ import {
   InMemoryStaticFileRepository
 } from "./in-memory-static-file.repository";
 
-describe("in-memory static file repository", () => {
+describe("in-memory document repository", () => {
   const now = new Date("2026-06-30T10:00:00.000Z");
   const later = new Date("2026-06-30T11:00:00.000Z");
 
@@ -86,8 +86,8 @@ describe("in-memory static file repository", () => {
   });
 });
 
-describe("static file infrastructure helpers", () => {
-  it("GIVEN crypto static file ID generation WHEN next is called THEN an STF id is returned", () => {
+describe("document infrastructure helpers", () => {
+  it("GIVEN crypto document ID generation WHEN next is called THEN an STF id is returned", () => {
     const generator = new CryptoStaticFileIdGenerator();
 
     expect(generator.next()).toMatch(/^STF-/);

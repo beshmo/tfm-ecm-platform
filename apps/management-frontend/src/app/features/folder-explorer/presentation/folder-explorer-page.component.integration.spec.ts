@@ -75,7 +75,7 @@ describe("folder explorer page integration", () => {
     };
   });
 
-  it("renders folders, selected folder content, static files, empty state, and request errors", async () => {
+  it("renders folders, selected folder content, documents, empty state, and request errors", async () => {
     const fixture = await renderExplorer();
 
     expect(pageText(fixture)).toContain("Folder Explorer");
@@ -89,7 +89,7 @@ describe("folder explorer page integration", () => {
     filesByFolder.set("FLD-child", []);
     await clickButton(fixture, "/Child");
 
-    expect(pageText(fixture)).toContain("This folder has no content records or static files.");
+    expect(pageText(fixture)).toContain("This folder has no content records or documents.");
 
     folderApi.listFolders.mockRejectedValueOnce({ message: "Folder request failed." });
     const errorFixture = TestBed.createComponent(FolderExplorerPageComponent);
@@ -205,7 +205,7 @@ describe("folder explorer page integration", () => {
     vi.unstubAllGlobals();
   });
 
-  it("uploads, renames, and deletes static files through rendered controls", async () => {
+  it("uploads, renames, and deletes documents through rendered controls", async () => {
     const fixture = await renderExplorer();
 
     await clickButton(fixture, "Upload file");
@@ -244,13 +244,13 @@ describe("folder explorer page integration", () => {
 
     staticFileApi.deleteFile.mockRejectedValueOnce({
       status: 404,
-      message: "Static file was not found."
+      message: "Document was not found."
     });
     await clickButton(fixture, "Delete", 1);
 
     expect(staticFileApi.deleteFile).toHaveBeenCalledWith("STF-1");
     expect(staticFileApi.listFiles).toHaveBeenLastCalledWith(ROOT_FOLDER_ID);
-    expect(pageText(fixture)).toContain("Static file was not found.");
+    expect(pageText(fixture)).toContain("Document was not found.");
     vi.unstubAllGlobals();
   });
 

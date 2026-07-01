@@ -46,14 +46,14 @@ export class StaticFileNameValidationError extends Error {
 
 export class UnsupportedStaticFileMimeTypeError extends Error {
   constructor(readonly mimeType: string) {
-    super(`Static file MIME type '${mimeType}' is not supported.`);
+    super(`Document MIME type '${mimeType}' is not supported.`);
     this.name = "UnsupportedStaticFileMimeTypeError";
   }
 }
 
 export class StaticFileTooLargeError extends Error {
   constructor(readonly size: number) {
-    super(`Static file size ${size} exceeds the maximum allowed size.`);
+    super(`Document size ${size} exceeds the maximum allowed size.`);
     this.name = "StaticFileTooLargeError";
   }
 }
@@ -91,33 +91,33 @@ export function renameStaticFile(
 
 export function normalizeStaticFileName(filename: unknown): string {
   if (typeof filename !== "string") {
-    throw new StaticFileNameValidationError("Static file name must be a string.");
+    throw new StaticFileNameValidationError("Document name must be a string.");
   }
 
   const normalizedName = filename.trim();
 
   if (normalizedName.length === 0) {
-    throw new StaticFileNameValidationError("Static file name must not be empty.");
+    throw new StaticFileNameValidationError("Document name must not be empty.");
   }
 
   if (normalizedName.length > MAX_FILENAME_LENGTH) {
-    throw new StaticFileNameValidationError("Static file name is too long.");
+    throw new StaticFileNameValidationError("Document name is too long.");
   }
 
   if (normalizedName === "." || normalizedName === "..") {
-    throw new StaticFileNameValidationError("Static file name must not be a relative path segment.");
+    throw new StaticFileNameValidationError("Document name must not be a relative path segment.");
   }
 
   if (normalizedName.includes("/") || normalizedName.includes("\\")) {
-    throw new StaticFileNameValidationError("Static file name must not contain path separators.");
+    throw new StaticFileNameValidationError("Document name must not contain path separators.");
   }
 
   if (CONTROL_CHARACTER_PATTERN.test(normalizedName)) {
-    throw new StaticFileNameValidationError("Static file name must not contain control characters.");
+    throw new StaticFileNameValidationError("Document name must not contain control characters.");
   }
 
   if (UNSAFE_FILESYSTEM_SYMBOL_PATTERN.test(normalizedName)) {
-    throw new StaticFileNameValidationError("Static file name contains unsafe filesystem symbols.");
+    throw new StaticFileNameValidationError("Document name contains unsafe filesystem symbols.");
   }
 
   return normalizedName;

@@ -80,10 +80,10 @@ The system SHALL prevent user-defined content type schemas from using names rese
 - **WHEN** a schema name attempts to define `folder` or `folders`
 - **THEN** validation fails because folder is an internal platform type
 
-#### Scenario: Static file type name is rejected
+#### Scenario: Document compatibility type name is rejected
 
 - **WHEN** a schema name attempts to define `static-file`, `static-files`, `file`, or `files`
-- **THEN** validation fails because static file is an internal platform type
+- **THEN** validation fails because document is an internal platform type and those names are reserved compatibility aliases
 
 ### Requirement: Create schema versions
 

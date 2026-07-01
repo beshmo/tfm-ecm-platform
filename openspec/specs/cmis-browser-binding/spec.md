@@ -88,7 +88,7 @@ The system SHALL support browsing folders and resolving objects by ID or path.
 
 #### Scenario: Get folder children
 - **WHEN** a client requests the children of a CMIS folder backed by an ECMP folder
-- **THEN** the system returns direct child folders, static files, and content records assigned to that folder
+- **THEN** the system returns direct child folders, documents, and content records assigned to that folder
 
 #### Scenario: Get object by ID
 - **WHEN** a client requests an object by a known ECMP-backed CMIS object ID
@@ -102,11 +102,11 @@ The system SHALL support browsing folders and resolving objects by ID or path.
 - **WHEN** a client requests a CMIS object ID or path that does not exist
 - **THEN** the system returns a CMIS-compatible not-found error response
 
-### Requirement: CMIS content streams are supported for static files
-The system SHALL expose content streams for CMIS documents backed by ECMP static files.
+### Requirement: CMIS content streams are supported for documents
+The system SHALL expose content streams for CMIS documents backed by ECMP documents.
 
-#### Scenario: Retrieve static file content stream
-- **WHEN** a client requests the content stream for a CMIS document backed by an ECMP static file
+#### Scenario: Retrieve document content stream
+- **WHEN** a client requests the content stream for a CMIS document backed by an ECMP document
 - **THEN** the system returns the stored binary stream with the file MIME type and filename metadata
 
 #### Scenario: Reject content stream for object without stream
@@ -124,23 +124,23 @@ The system SHALL allow supported CMIS clients to create ECMP folders through the
 - **WHEN** a CMIS create-folder request violates ECMP folder validation or parent lookup rules
 - **THEN** the system returns a CMIS-compatible error response mapped from the ECMP folder error
 
-### Requirement: CMIS document creation is supported for static files
-The system SHALL allow supported CMIS clients to create static-file-backed CMIS documents through the Browser Binding.
+### Requirement: CMIS document creation is supported for documents
+The system SHALL allow supported CMIS clients to create document-backed CMIS documents through the Browser Binding.
 
 #### Scenario: Create document with content stream
 - **WHEN** a valid CMIS create-document request provides a parent folder, document name, MIME type, and content stream
-- **THEN** the system stores the binary through ECMP static file storage and returns the mapped CMIS document object
+- **THEN** the system stores the binary through ECMP document storage and returns the mapped CMIS document object
 
 #### Scenario: Reject invalid document create
 - **WHEN** a CMIS create-document request violates ECMP file validation, media type, size, storage, or parent lookup rules
-- **THEN** the system returns a CMIS-compatible error response mapped from the ECMP static file error
+- **THEN** the system returns a CMIS-compatible error response mapped from the ECMP document error
 
 ### Requirement: CMIS object deletion is supported for mapped resources
 The system SHALL delete supported ECMP-backed CMIS objects using existing ECMP delete rules.
 
-#### Scenario: Delete static file document
-- **WHEN** a client deletes a CMIS document backed by an ECMP static file
-- **THEN** the system deletes the static file metadata and stored binary through existing ECMP behavior
+#### Scenario: Delete document
+- **WHEN** a client deletes a CMIS document backed by an ECMP document
+- **THEN** the system deletes the document metadata and stored binary through existing ECMP behavior
 
 #### Scenario: Delete empty folder
 - **WHEN** a client deletes a CMIS folder backed by an empty non-root ECMP folder

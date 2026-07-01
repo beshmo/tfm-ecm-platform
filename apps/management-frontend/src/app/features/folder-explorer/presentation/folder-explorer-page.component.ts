@@ -71,7 +71,7 @@ type EditorMode = "create" | "edit";
           <p *ngIf="loading">Loading content...</p>
           <p *ngIf="errorMessage" class="error">{{ errorMessage }}</p>
           <p *ngIf="!loading && !errorMessage && contents.length === 0 && files.length === 0" class="empty">
-            This folder has no content records or static files.
+            This folder has no content records or documents.
           </p>
 
           <table *ngIf="contents.length > 0">
