@@ -46,11 +46,46 @@ describe("content-service CMIS Browser Binding adapter", () => {
       .get(`/api/cmis/${CMIS_REPOSITORY_ID}/types`)
       .expect(200)
       .expect((response) => {
-        expect(response.body.types.map((type: { id: string }) => type.id)).toEqual([
+        const types: Array<{ id: string }> = response.body.types;
+
+        expect(types.map((type) => type.id)).toEqual([
           "cmis:folder",
           "cmis:document",
+          "cmis:item",
           "ecmp:generic"
         ]);
+
+        // Every returned type definition exposes the CMIS 1.1 common object-type
+        // attributes with conservative unsupported-behavior flags.
+        for (const type of types) {
+          expect(type).toEqual(
+            expect.objectContaining({
+              localName: expect.any(String),
+              localNamespace: expect.any(String),
+              queryName: expect.any(String),
+              displayName: expect.any(String),
+              description: expect.any(String),
+              baseId: expect.any(String),
+              queryable: false,
+              controllablePolicy: false,
+              controllableACL: false,
+              fulltextIndexed: false,
+              includedInSupertypeQuery: false,
+              typeMutability: { create: false, update: false, delete: false }
+            })
+          );
+          expect(type).toHaveProperty("parentId");
+        }
+
+        // Unsupported optional base types are not advertised.
+        const typeIds = types.map((type) => type.id);
+        expect(typeIds).not.toContain("cmis:relationship");
+        expect(typeIds).not.toContain("cmis:policy");
+        expect(typeIds).not.toContain("cmis:secondary");
+
+        // The ECMP custom content type descends from cmis:item.
+        const genericType = types.find((type) => type.id === "ecmp:generic");
+        expect(genericType).toMatchObject({ baseId: "cmis:item", parentId: "cmis:item" });
       });
   });
 

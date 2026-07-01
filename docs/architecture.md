@@ -1655,9 +1655,12 @@ Initial CMIS mapping:
 | Repository | ECMP Management Stage repository |
 | `cmis:folder` | Folder |
 | `cmis:document` | Static file with binary content stream |
-| Custom CMIS type | User-defined content type schema or structured content record view |
+| `cmis:item` | Base object type for structured content records |
+| Custom CMIS type (`ecmp:<name>`) | User-defined content type schema, exposed as a `cmis:item` descendant |
 | Object ID | Existing ECMP global ID such as `FLD-*`, `STF-*`, or `RCD-*` |
 | Allowable actions | Existing RBAC permissions and object lifecycle constraints |
+
+Structured content records map to custom object types with `cmis:item` as their base type, so CMIS type discovery advertises `cmis:folder`, `cmis:document`, `cmis:item`, and the active ECMP custom content types. Every returned object-type definition exposes the CMIS 1.1 common object-type attributes (identity, hierarchy, display, behavior flags, indexing flags, and type mutability) with conservative defaults: base types use `parentId: null`, custom content types use `parentId: cmis:item`, and `queryable`, `controllablePolicy`, `controllableACL`, `fulltextIndexed`, `includedInSupertypeQuery`, and all `typeMutability` flags stay `false` while the matching CMIS services are unsupported. The optional base types `cmis:relationship`, `cmis:policy`, and `cmis:secondary` are not advertised until ECMP has backing domain behavior for them.
 
 The first CMIS slice should target Browser Binding operations for repository discovery, type discovery, folder children, object lookup by ID, object lookup by path, static file content stream retrieval, folder creation, static-file-backed document creation, and supported object deletion.
 
