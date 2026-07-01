@@ -9,5 +9,6 @@ export interface StaticFileStorageSaveInput {
 
 export interface StaticFileStorage {
   save(input: StaticFileStorageSaveInput): Promise<{ path: string }>;
+  read(path: string): Promise<Buffer>;
   delete(path: string): Promise<void>;
 }

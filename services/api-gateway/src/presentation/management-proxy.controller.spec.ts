@@ -183,6 +183,60 @@ describe("api-gateway management proxy", () => {
     expect(headers.get("content-type")).toContain("multipart/form-data");
   });
 
+  it("GIVEN a CMIS read request WHEN proxied THEN it forwards to the Content Service", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { repositoryId: "ecmp-management" }));
+
+    await request(app.getHttpServer())
+      .get("/api/cmis/ecmp-management/types")
+      .expect(200)
+      .expect({ repositoryId: "ecmp-management" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3002/api/cmis/ecmp-management/types",
+      expect.objectContaining({ method: "GET" })
+    );
+  });
+
+  it("GIVEN a CMIS form request WHEN proxied THEN it preserves form content type and body", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { objectId: "FLD-1" }));
+
+    await request(app.getHttpServer())
+      .post("/api/cmis/ecmp-management/folders")
+      .type("form")
+      .send({ parentId: "FLD-root", name: "folder1" })
+      .expect(201)
+      .expect({ objectId: "FLD-1" });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = init.headers as Headers;
+
+    expect(init.method).toBe("POST");
+    expect(headers.get("content-type")).toContain("application/x-www-form-urlencoded");
+    expect(String(init.body)).toBe("parentId=FLD-root&name=folder1");
+  });
+
+  it("GIVEN a CMIS document upload WHEN proxied THEN it preserves multipart content type", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { objectId: "STF-1" }));
+
+    await request(app.getHttpServer())
+      .post("/api/cmis/ecmp-management/documents")
+      .field("parentId", "FLD-root")
+      .attach("file", Buffer.from("content"), {
+        filename: "manual.pdf",
+        contentType: "application/pdf"
+      })
+      .expect(201)
+      .expect({ objectId: "STF-1" });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit & { duplex?: string }];
+    const headers = init.headers as Headers;
+
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeDefined();
+    expect(init.duplex).toBe("half");
+    expect(headers.get("content-type")).toContain("multipart/form-data");
+  });
+
   it("GIVEN a downstream API error WHEN proxied THEN it preserves status and body", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(409, { message: "Conflict" }));
 

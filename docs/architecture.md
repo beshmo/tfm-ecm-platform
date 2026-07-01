@@ -8,7 +8,7 @@ Important architecture decisions are tracked as Architecture Decision Records in
 
 ## System Context
 
-ECMP is intended to be used by authenticated internal users through the Management Frontend. The platform does not currently expose a public consumer-facing experience or public external API.
+ECMP is intended to be used by authenticated internal users through the Management Frontend. The platform does not currently expose a public consumer-facing experience or public external API. A planned CMIS compatibility API will allow authenticated enterprise content clients to access the Management Stage through a standards-based adapter without replacing the native ECMP REST APIs.
 
 Human users:
 
@@ -26,6 +26,7 @@ Application clients:
 | Management Frontend | Used by content authors and admins over HTTPS. |
 | Internal Management API clients | Internal platform clients only. |
 | Internal Delivery API clients | Internal platform clients only. |
+| CMIS clients | Authenticated standards-based management clients using the planned CMIS Browser Binding compatibility API. |
 
 External systems:
 
@@ -40,7 +41,7 @@ Out of scope for the current architecture:
 
 * Public consumers.
 * Public external clients using the Delivery API.
-* Public external clients using the Management API.
+* Unauthenticated public external clients using the Management API.
 
 ## High-Level Architecture
 
@@ -50,14 +51,19 @@ ECMP separates content management from content delivery. Content authors and adm
 flowchart TD
   subgraph management["Management Stage"]
     frontend["Management Frontend"]
+    cmisClient["CMIS Client"]
     gateway["API Gateway"]
     managementApi["Management API"]
+    cmisApi["CMIS Browser Binding Adapter"]
     managementDb[("Management MongoDB<br/>Authoring Content")]
     publishRequest["Publish Request"]
     rabbitmq["RabbitMQ"]
 
     frontend --> gateway
+    cmisClient --> gateway
     gateway --> managementApi
+    gateway --> cmisApi
+    cmisApi --> managementApi
     managementApi --> managementDb
     managementDb --> publishRequest
     publishRequest --> rabbitmq
@@ -497,6 +503,7 @@ Each service owns a specific part of the domain model and should expose that own
 | Publication Worker | Execution of publication and unpublication events between Management and Delivery stages. |
 | Delivery Service | Published read model access and internal delivery queries. |
 | API Gateway | Request routing, edge authentication integration, and cross-cutting API concerns. |
+| CMIS Browser Binding Adapter | Planned standards-based CMIS compatibility layer that maps CMIS requests to existing ECMP management capabilities. |
 
 Ownership rules:
 
@@ -505,6 +512,7 @@ Ownership rules:
 * The Content Type Service is the source of truth for schemas.
 * The Publication Service is the source of truth for publication requests.
 * The Delivery Service exposes published read models but does not own authoring content.
+* The CMIS Browser Binding Adapter does not own data. It translates CMIS requests into existing Content Service, Content Type Service, and authorization behavior.
 * The Identity Service is the source of truth for authentication, authorization, sessions, users, and roles.
 * The Publication Worker updates Delivery storage only as part of a publication or unpublication event.
 
@@ -1630,10 +1638,37 @@ Management and Delivery data must not share the same MongoDB collections. The mi
 | Containerization | Docker |
 | Orchestration | Kubernetes |
 | API | REST |
+| Compatibility API | CMIS 1.1 Browser Binding |
 | Schema definition | YAML |
 | Content definition | YAML |
 
-REST will be the initial and primary API style. GraphQL may be considered later as a future enhancement.
+REST will be the initial and primary API style. CMIS 1.1 Browser Binding will be introduced as a standards-based compatibility layer over the Management Stage for authenticated enterprise content clients. GraphQL may be considered later as a future enhancement.
+
+### CMIS Compatibility API
+
+CMIS support is planned as an adapter over ECMP's native management capabilities. It should expose one management repository first, representing the Management Stage authoring repository.
+
+Initial CMIS mapping:
+
+| CMIS concept | ECMP concept |
+| --- | --- |
+| Repository | ECMP Management Stage repository |
+| `cmis:folder` | Folder |
+| `cmis:document` | Static file with binary content stream |
+| Custom CMIS type | User-defined content type schema or structured content record view |
+| Object ID | Existing ECMP global ID such as `FLD-*`, `STF-*`, or `RCD-*` |
+| Allowable actions | Existing RBAC permissions and object lifecycle constraints |
+
+The first CMIS slice should target Browser Binding operations for repository discovery, type discovery, folder children, object lookup by ID, object lookup by path, static file content stream retrieval, folder creation, static-file-backed document creation, and supported object deletion.
+
+Out of scope for the initial CMIS slice:
+
+* AtomPub and Web Services bindings.
+* CMIS query and changelog services.
+* Relationships, policies, renditions, retentions, and holds.
+* Checkout/checkin and full CMIS versioning services.
+* Multifiling, unfiling, and ACL mutation.
+* Full CMIS conformance certification.
 
 ## Implementation Guidelines
 
@@ -1714,14 +1749,14 @@ Minimum expected tests per layer:
 | Domain unit tests | 100% | Entities, value objects, validation rules, content lifecycle rules, folder rules, ID rules, and publication domain rules. |
 | Application use case tests | 100% | Use cases such as creating folders, updating content instances, deleting records, uploading file metadata, publishing, unpublishing, login, and token refresh. |
 | Service integration tests | 30% | Service behavior with real or test infrastructure dependencies such as MongoDB, Redis, RabbitMQ, and filesystem-backed storage. |
-| API contract tests | 100% | REST request and response contracts, status codes, authentication requirements, authorization requirements, and error shapes. |
+| API contract tests | 100% | REST and CMIS request and response contracts, status codes, authentication requirements, authorization requirements, and error shapes. |
 | Angular component/integration tests | 20% | Components, forms, route guards, frontend use case integration, API client mapping, and folder explorer interactions. |
 | Playwright E2E workflows | 10% | Critical browser workflows across the Management Frontend and APIs. |
 
 Coverage rules:
 
 * Domain and application layers must be fully covered because they contain business rules and use cases.
-* API contract tests must cover every documented endpoint before the endpoint is considered complete.
+* API contract tests must cover every documented REST or CMIS endpoint before the endpoint is considered complete.
 * Integration, Angular, and E2E targets start lower because they are more expensive to maintain and should focus on the highest-risk behavior first.
 * Coverage targets should increase later as the platform stabilizes.
 * A feature should not be considered complete if its domain rules, use cases, or API contracts are missing tests.
@@ -1939,6 +1974,7 @@ Initial API Gateway routing:
 | `/api/management/content-types*` | Content Type Service |
 | `/api/management/*publication-requests*` | Publication Service |
 | `/api/delivery/contents*` | Delivery Service |
+| `/api/cmis*` | CMIS Browser Binding Adapter |
 
 Ingress and gateway rules:
 
@@ -2158,6 +2194,7 @@ UnpublicationFailed
 | Performance | Delivery APIs should provide low-latency read access. |
 | Security | Role-based access control will protect management operations and frontend access. |
 | Usability | Content authors should be able to perform CRUD and publish or unpublish operations through the frontend. |
+| Interoperability | Authenticated enterprise clients should be able to access supported management repository operations through CMIS Browser Binding. |
 | Observability | Logs, metrics, and traces must support troubleshooting. |
 | Extensibility | New content types should be introduced without application code changes. |
 | Portability | The platform should run in local containers and Kubernetes environments. |

@@ -233,9 +233,24 @@ class MemoryStaticFileStorage implements StaticFileStorage {
   readonly deleteMock = vi.fn(async (path: string) => {
     this.deletedPaths.push(path);
   });
+  readonly files = new Map<string, Buffer>();
 
   async save(input: StaticFileStorageSaveInput): Promise<{ path: string }> {
-    return { path: `stored/${input.fileId}` };
+    const path = `stored/${input.fileId}`;
+
+    this.files.set(path, input.buffer);
+
+    return { path };
+  }
+
+  async read(path: string): Promise<Buffer> {
+    const file = this.files.get(path);
+
+    if (!file) {
+      throw new Error("missing file");
+    }
+
+    return file;
   }
 
   async delete(path: string): Promise<void> {

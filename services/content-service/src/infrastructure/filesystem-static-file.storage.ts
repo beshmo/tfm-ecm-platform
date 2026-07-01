@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { StaticFileStorage, StaticFileStorageSaveInput } from "../domain/static-file.storage";
@@ -40,6 +40,12 @@ export class FilesystemStaticFileStorage implements StaticFileStorage {
     const fullPath = resolveStoredPath(this.rootPath, storedPath);
 
     await rm(fullPath, { force: true });
+  }
+
+  async read(storedPath: string): Promise<Buffer> {
+    const fullPath = resolveStoredPath(this.rootPath, storedPath);
+
+    return readFile(fullPath);
   }
 
   private temporaryPath(): string {

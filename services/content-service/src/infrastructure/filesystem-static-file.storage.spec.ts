@@ -48,10 +48,30 @@ describe("filesystem static file storage", () => {
     await expect(stat(path.join(rootPath, stored.path))).rejects.toThrow();
   });
 
+  it("GIVEN a stored path under the root WHEN read THEN it returns the binary", async () => {
+    const storage = new FilesystemStaticFileStorage(rootPath);
+    const stored = await storage.save({
+      fileId: "STF-file1" as StaticFileId,
+      filename: "manual.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("content")
+    });
+
+    await expect(storage.read(stored.path)).resolves.toEqual(Buffer.from("content"));
+  });
+
   it("GIVEN a traversal path WHEN deleted THEN it rejects access outside the root", async () => {
     const storage = new FilesystemStaticFileStorage(rootPath);
 
     await expect(storage.delete("../outside.pdf")).rejects.toThrow(
+      "Static file path is outside the storage root."
+    );
+  });
+
+  it("GIVEN a traversal path WHEN read THEN it rejects access outside the root", async () => {
+    const storage = new FilesystemStaticFileStorage(rootPath);
+
+    await expect(storage.read("../outside.pdf")).rejects.toThrow(
       "Static file path is outside the storage root."
     );
   });

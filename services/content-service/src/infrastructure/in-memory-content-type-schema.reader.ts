@@ -19,6 +19,16 @@ export class InMemoryContentTypeSchemaReader implements ContentTypeSchemaReader 
     this.schemas.set(schemaKey(schema.name, schema.version), cloneSchema(schema));
   }
 
+  async listActive(): Promise<ContentTypeSchemaDefinition[]> {
+    return [...this.schemas.values()]
+      .sort((left, right) => {
+        const nameDiff = left.name.localeCompare(right.name);
+
+        return nameDiff === 0 ? compareVersions(right.version, left.version) : nameDiff;
+      })
+      .map(cloneSchema);
+  }
+
   async findLatestActiveByName(
     name: ContentTypeName
   ): Promise<ContentTypeSchemaDefinition | null> {

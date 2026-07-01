@@ -22,6 +22,7 @@ The main objectives of ECMP are:
 * Use schema-driven content definitions.
 * Enable asynchronous publishing and unpublishing operations.
 * Separate content authoring from public content delivery.
+* Provide standards-based CMIS compatibility for enterprise content clients.
 * Follow cloud-native and Twelve-Factor application principles.
 * Provide a clear academic and professional portfolio case study.
 
@@ -49,10 +50,11 @@ Detailed technical documentation lives in the `docs` directory:
 | Containerization | Docker |
 | Orchestration | Kubernetes |
 | API | REST |
+| Compatibility API | CMIS 1.1 Browser Binding, planned |
 | Schema definition | YAML |
 | Content definition | YAML |
 
-REST will be the initial and primary API style. GraphQL may be considered later as a future enhancement.
+REST will be the initial and primary API style. CMIS 1.1 Browser Binding support is planned as a standards-based compatibility layer over the Management Stage, not as a replacement for ECMP's native REST APIs. GraphQL may be considered later as a future enhancement.
 
 ## Required Applications and Tools
 
@@ -200,6 +202,7 @@ ecmp-platform/
 ### Phase 5 - Delivery and Deployment
 
 * Implement the Delivery Service.
+* Add initial CMIS Browser Binding compatibility for the Management Stage.
 * Add Kubernetes manifests or Helm charts.
 * Add Management and Delivery persistent file storage volumes.
 * Add observability basics.
