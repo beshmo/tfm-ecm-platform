@@ -44,9 +44,7 @@ describe("content type schema use cases", () => {
     expect(schema).toEqual({
       name: "generic",
       version: "1.0",
-      fields: {
-        title: { type: "string", required: true }
-      }
+      fields: [{ name: "title", type: "string", required: true }]
     });
   });
 
@@ -67,7 +65,11 @@ describe("content type schema use cases", () => {
       schemaSource("generic", "1.0", "headline")
     );
 
-    expect(replaced.fields["headline"]).toEqual({ type: "string", required: true });
+    expect(replaced.fields.find((field) => field.name === "headline")).toEqual({
+      name: "headline",
+      type: "string",
+      required: true
+    });
   });
 
   it("GIVEN a replace request WHEN YAML name or version does not match THEN it rejects the mismatch", async () => {
@@ -154,7 +156,7 @@ function schemaSource(name: string, version: string, fieldName = "title"): strin
 name: ${name}
 version: ${version}
 fields:
-  ${fieldName}:
+  - name: ${fieldName}
     type: string
     required: true
 `;

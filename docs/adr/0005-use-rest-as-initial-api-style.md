@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The initial platform needs clear API contracts for content CRUD, folder CRUD, content type CRUD, file metadata, publication requests, unpublication requests, authentication, and delivery retrieval.
+The initial platform needs clear API contracts for content CRUD, folder CRUD, content type CRUD, document metadata, publication requests, unpublication requests, authentication, and delivery retrieval.
 
 ## Decision
 
@@ -17,4 +17,3 @@ GraphQL may be considered later as a future enhancement, but it is not part of t
 ## Consequences
 
 REST keeps the first implementation straightforward, easy to test with API contract tests, and familiar for portfolio review. Endpoint design must be maintained carefully as the platform grows.
-

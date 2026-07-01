@@ -70,7 +70,7 @@ function resolveStoredPath(rootPath: string, storedPath: string): string {
   const resolvedRootPath = path.resolve(rootPath);
 
   if (fullPath !== resolvedRootPath && !fullPath.startsWith(`${resolvedRootPath}${path.sep}`)) {
-    throw new Error("Static file path is outside the storage root.");
+    throw new Error("Document path is outside the storage root.");
   }
 
   return fullPath;

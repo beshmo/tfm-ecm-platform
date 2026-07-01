@@ -9,32 +9,59 @@ import {
 describe("strict YAML schema parser", () => {
   const parser = new StrictYamlSchemaParser();
 
-  it("GIVEN a valid YAML schema WHEN it is parsed THEN it returns a normalized JSON-compatible schema", () => {
+  it("GIVEN a valid ordered YAML schema WHEN it is parsed THEN it returns a normalized ordered field array", () => {
     const schema = parser.parse(`
 name: generic
 version: 1.0
 fields:
-  title:
+  - name: title
     type: string
     required: true
-  priority:
+  - name: priority
     type: integer
-  publishDate:
+  - name: publishDate
     type: date
-  publishTime:
+  - name: publishTime
     type: time
 `);
 
     expect(schema).toEqual({
       name: "generic",
       version: "1.0",
-      fields: {
-        title: { type: "string", required: true },
-        priority: { type: "integer", required: false },
-        publishDate: { type: "date", required: false },
-        publishTime: { type: "time", required: false }
-      }
+      fields: [
+        { name: "title", type: "string", required: true },
+        { name: "priority", type: "integer", required: false },
+        { name: "publishDate", type: "date", required: false },
+        { name: "publishTime", type: "time", required: false }
+      ]
     });
+  });
+
+  it("GIVEN an ordered YAML schema WHEN field order differs THEN the normalized fields preserve the YAML sequence order", () => {
+    const schema = parser.parse(`
+name: generic
+version: 1.0
+fields:
+  - name: priority
+    type: integer
+  - name: title
+    type: string
+    required: true
+`);
+
+    expect(schema.fields.map((field) => field.name)).toEqual(["priority", "title"]);
+  });
+
+  it("GIVEN an optional required flag WHEN it is omitted THEN the normalized field defaults required to false", () => {
+    const schema = parser.parse(`
+name: generic
+version: 1.0
+fields:
+  - name: title
+    type: string
+`);
+
+    expect(schema.fields[0]).toEqual({ name: "title", type: "string", required: false });
   });
 
   it("GIVEN invalid YAML WHEN it is parsed THEN it returns a sanitized validation error", () => {
@@ -66,13 +93,32 @@ version: 1.0
     expect(() =>
       parser.parse(`
 fields:
-  title:
+  - name: title
     type: string
 `)
     ).toThrowError(SchemaValidationError);
   });
 
-  it("GIVEN invalid fields shapes WHEN they are parsed THEN it rejects the schema", () => {
+  it("GIVEN a legacy field mapping WHEN it is parsed THEN it rejects fields that are not an ordered sequence", () => {
+    try {
+      parser.parse(`
+name: generic
+version: 1.0
+fields:
+  title:
+    type: string
+    required: true
+`);
+      throw new Error("Expected SchemaValidationError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(SchemaValidationError);
+      expect((error as SchemaValidationError).issues).toContain(
+        "Schema fields must be an ordered sequence, not a mapping."
+      );
+    }
+  });
+
+  it("GIVEN empty field collections WHEN they are parsed THEN it rejects the schema", () => {
     expect(() =>
       parser.parse(`
 name: generic
@@ -88,15 +134,35 @@ version: 1.0
 fields: {}
 `)
     ).toThrowError(SchemaValidationError);
+  });
 
+  it("GIVEN a field entry without a name WHEN it is parsed THEN it rejects the field", () => {
     expect(() =>
       parser.parse(`
 name: generic
 version: 1.0
 fields:
-  title: string
+  - type: string
 `)
     ).toThrowError(SchemaValidationError);
+  });
+
+  it("GIVEN duplicate field names WHEN they are parsed THEN it rejects the schema", () => {
+    try {
+      parser.parse(`
+name: generic
+version: 1.0
+fields:
+  - name: title
+    type: string
+  - name: title
+    type: integer
+`);
+      throw new Error("Expected SchemaValidationError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(SchemaValidationError);
+      expect((error as SchemaValidationError).issues).toContain("Duplicate field name 'title'.");
+    }
   });
 
   it("GIVEN an unsupported field type WHEN it is parsed THEN it rejects the field", () => {
@@ -105,7 +171,7 @@ fields:
 name: generic
 version: 1.0
 fields:
-  title:
+  - name: title
     type: markdown
 `)
     ).toThrow(SchemaValidationError);
@@ -118,33 +184,33 @@ name: generic
 version: 1.0
 description: not allowed
 fields:
-  title:
+  - name: title
     type: string
 `)
     ).toThrow(SchemaValidationError);
   });
 
-  it("GIVEN unexpected field keys WHEN it is parsed THEN it rejects the field definition", () => {
+  it("GIVEN unexpected field entry keys WHEN it is parsed THEN it rejects the field definition", () => {
     expect(() =>
       parser.parse(`
 name: generic
 version: 1.0
 fields:
-  title:
+  - name: title
     type: string
     description: not allowed
 `)
     ).toThrow(SchemaValidationError);
   });
 
-  it("GIVEN prototype pollution keys WHEN it is parsed THEN it rejects unsafe keys", () => {
+  it("GIVEN prototype pollution field names WHEN it is parsed THEN it rejects unsafe names", () => {
     for (const unsafeKey of ["__proto__", "prototype", "constructor"]) {
       expect(() =>
         parser.parse(`
 name: generic
 version: 1.0
 fields:
-  ${unsafeKey}:
+  - name: ${unsafeKey}
     type: string
 `)
       ).toThrow(SchemaValidationError);
@@ -157,7 +223,7 @@ fields:
 name: generic
 version: 1.0
 fields:
-  bad-name:
+  - name: bad-name
     type: string
 `)
     ).toThrow(SchemaValidationError);
@@ -167,7 +233,7 @@ fields:
 name: generic
 version: 1.0
 fields:
-  "":
+  - name: ""
     type: string
 `)
     ).toThrow(SchemaValidationError);
@@ -179,21 +245,24 @@ fields:
 name: generic
 version: 1.0
 fields:
-  title: &titleField
+  - name: title
     type: string
-  headline: *titleField
+    required: &req true
+  - name: headline
+    type: string
+    required: *req
 `)
     ).toThrow(SchemaValidationError);
   });
 
   it("GIVEN an oversized YAML source WHEN it is parsed THEN it rejects the input before parsing", () => {
-    const oversizedSource = `name: generic\nversion: 1.0\nfields:\n  title:\n    type: string\n${"a".repeat(70 * 1024)}`;
+    const oversizedSource = `name: generic\nversion: 1.0\nfields:\n  - name: title\n    type: string\n${"a".repeat(70 * 1024)}`;
 
     expect(() => parser.parse(oversizedSource)).toThrow(SchemaValidationError);
   });
 
   it("GIVEN no parser size option WHEN it is constructed THEN the default source size limit is used", () => {
-    const oversizedSource = `name: generic\nversion: 1.0\nfields:\n  title:\n    type: string\n${"a".repeat(DEFAULT_MAX_SCHEMA_SOURCE_BYTES)}`;
+    const oversizedSource = `name: generic\nversion: 1.0\nfields:\n  - name: title\n    type: string\n${"a".repeat(DEFAULT_MAX_SCHEMA_SOURCE_BYTES)}`;
 
     expect(() => new StrictYamlSchemaParser().parse(oversizedSource)).toThrow(
       SchemaValidationError
@@ -219,7 +288,7 @@ fields:
 name: ${reservedName}
 version: 1.0
 fields:
-  title:
+  - name: title
     type: string
 `)
       ).toThrow(SchemaValidationError);

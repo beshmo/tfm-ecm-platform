@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Content instances need to be grouped into hierarchical folders. The platform also needs clear identifiers for folders, content instances, and static files.
+Content instances need to be grouped into hierarchical folders. The platform also needs clear identifiers for folders, content instances, and documents.
 
 ## Decision
 
@@ -16,11 +16,10 @@ Global IDs will use prefixes:
 
 * `FLD-` for folders.
 * `RCD-` for content instances.
-* `STF-` for static files.
+* `STF-` for documents.
 
 The root folder `/` has the reserved ID `FLD-root`.
 
 ## Consequences
 
 Identifiers are easy to inspect and route through APIs. Folder rules must include filesystem-like name validation and unique names within the same parent folder.
-

@@ -88,11 +88,11 @@ git diff --check
 
 ## Follow-Up Hardening
 
-When file upload endpoints are implemented:
+When document upload endpoints are implemented:
 
 * Configure Multer limits explicitly, including `fieldNestingDepth`, `fields`, `files`, and `fileSize`.
 * Require authentication and authorization for upload routes.
-* Validate file metadata and content type before accepting uploads.
+* Validate document metadata and content type before accepting uploads.
 * Add dependency and image vulnerability scanning to CI.
 
 References:

@@ -29,6 +29,7 @@ export function validateContentInstanceData(
 
   const errors: ContentValidationError[] = [];
   const fieldNames = Object.keys(data);
+  const fieldsByName = new Map(schema.fields.map((field) => [field.name, field]));
 
   for (const fieldName of fieldNames) {
     if (FORBIDDEN_FIELD_NAMES.has(fieldName)) {
@@ -42,7 +43,7 @@ export function validateContentInstanceData(
       continue;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(schema.fields, fieldName)) {
+    if (!fieldsByName.has(fieldName)) {
       errors.push(
         buildError(
           fieldName,
@@ -53,7 +54,8 @@ export function validateContentInstanceData(
     }
   }
 
-  for (const [fieldName, fieldDefinition] of Object.entries(schema.fields)) {
+  for (const fieldDefinition of schema.fields) {
+    const fieldName = fieldDefinition.name;
     const valueExists = Object.prototype.hasOwnProperty.call(data, fieldName);
     const value = data[fieldName];
 

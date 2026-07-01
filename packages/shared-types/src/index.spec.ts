@@ -125,16 +125,22 @@ describe("shared types", () => {
     const schema: ContentTypeSchemaDefinition = {
       name: "generic",
       version: "1.0",
-      fields: {
-        title: { type: "string", required: true },
-        priority: { type: "integer", required: false },
-        publishDate: { type: "date", required: false },
-        publishTime: { type: "time", required: false }
-      }
+      fields: [
+        { name: "title", type: "string", required: true },
+        { name: "priority", type: "integer", required: false },
+        { name: "publishDate", type: "date", required: false },
+        { name: "publishTime", type: "time", required: false }
+      ]
     };
 
-    expect(schema.fields["title"]?.required).toBe(true);
-    expect(schema.fields["priority"]?.type).toBe("integer");
+    expect(schema.fields.map((field) => field.name)).toEqual([
+      "title",
+      "priority",
+      "publishDate",
+      "publishTime"
+    ]);
+    expect(schema.fields[0]?.required).toBe(true);
+    expect(schema.fields[1]?.type).toBe("integer");
     expect(supportedFieldTypes).toEqual(["string", "integer", "date", "time"]);
   });
 
@@ -156,12 +162,12 @@ describe("shared types", () => {
     expect(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA).toEqual({
       name: "generic",
       version: "1.0",
-      fields: {
-        title: { type: "string", required: true },
-        priority: { type: "integer", required: false },
-        publishDate: { type: "date", required: false },
-        publishTime: { type: "time", required: false }
-      }
+      fields: [
+        { name: "title", type: "string", required: true },
+        { name: "priority", type: "integer", required: false },
+        { name: "publishDate", type: "date", required: false },
+        { name: "publishTime", type: "time", required: false }
+      ]
     });
   });
 
@@ -247,7 +253,7 @@ describe("shared types", () => {
     expect(patchInput.data?.["title"]).toBe("Patched");
   });
 
-  it("GIVEN static file contracts WHEN shared THEN metadata management shapes are supported", () => {
+  it("GIVEN document contracts WHEN shared THEN metadata management shapes are supported", () => {
     const file: StaticFile = {
       fileId: "STF-123",
       folderId: ROOT_FOLDER_ID,
@@ -359,10 +365,10 @@ describe("shared types", () => {
     const articleType = cmisTypeDefinitionFromSchema({
       name: "article",
       version: "1.0",
-      fields: {
-        title: { type: "string", required: true },
-        priority: { type: "integer", required: false }
-      }
+      fields: [
+        { name: "title", type: "string", required: true },
+        { name: "priority", type: "integer", required: false }
+      ]
     });
 
     expect(baseTypes.map((type) => type.id)).toEqual([

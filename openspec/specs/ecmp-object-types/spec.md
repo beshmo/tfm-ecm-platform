@@ -46,10 +46,10 @@ The system SHALL use `Document` terminology for the ECMP object type that repres
 
 #### Scenario: Document type describes binary content
 - **WHEN** ECMP object-type definitions describe binary content with stored bytes and metadata
-- **THEN** the type is named Document Type rather than Static File Type
+- **THEN** the type is named Document Type rather than the deprecated binary asset term
 
 #### Scenario: Existing storage compatibility remains internal
-- **WHEN** implementation details still use static-file storage or existing file routes
+- **WHEN** implementation details still use legacy file storage names or existing file routes
 - **THEN** those names remain compatibility or storage details and do not change the ECMP object-type name Document
 
 ### Requirement: ECMP object-type attributes map to CMIS object-type attributes

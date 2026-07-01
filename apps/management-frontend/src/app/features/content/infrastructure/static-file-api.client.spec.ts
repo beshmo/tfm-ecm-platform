@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { StaticFileApiClient } from "./static-file-api.client";
 
-describe("static file api client", () => {
+describe("document api client", () => {
   it("lists files by folder through the gateway URL", async () => {
     const http = {
       get: vi.fn().mockReturnValue(of([{ fileId: "STF-1" }]))
@@ -16,7 +16,7 @@ describe("static file api client", () => {
     expect(http.get).toHaveBeenCalledWith("/api/management/files?folderId=FLD-root");
   });
 
-  it("encodes dynamic static file management URLs", async () => {
+  it("encodes dynamic document management URLs", async () => {
     const http = {
       get: vi.fn().mockReturnValue(of([])),
       patch: vi.fn().mockReturnValue(of({ fileId: "STF-a/b", filename: "renamed.pdf" })),
@@ -67,7 +67,7 @@ describe("static file api client", () => {
           () =>
             new HttpErrorResponse({
               status: 415,
-              error: { message: "Static file MIME type is not supported." }
+              error: { message: "Document MIME type is not supported." }
             })
         )
       )
@@ -78,7 +78,7 @@ describe("static file api client", () => {
       client.uploadFile(ROOT_FOLDER_ID, new File(["content"], "app.exe"))
     ).rejects.toMatchObject({
       status: 415,
-      message: "Static file MIME type is not supported."
+      message: "Document MIME type is not supported."
     });
   });
 
@@ -89,7 +89,7 @@ describe("static file api client", () => {
           () =>
             new HttpErrorResponse({
               status: 413,
-              error: { message: "Static file is too large." }
+              error: { message: "Document is too large." }
             })
         )
       ),
@@ -98,7 +98,7 @@ describe("static file api client", () => {
           () =>
             new HttpErrorResponse({
               status: 500,
-              error: { message: "Static file storage failed." }
+              error: { message: "Document storage failed." }
             })
         )
       )
@@ -109,11 +109,11 @@ describe("static file api client", () => {
       client.uploadFile(ROOT_FOLDER_ID, new File(["content"], "large.pdf"))
     ).rejects.toMatchObject({
       status: 413,
-      message: "Static file is too large."
+      message: "Document is too large."
     });
     await expect(client.deleteFile("STF-1")).rejects.toMatchObject({
       status: 500,
-      message: "Static file storage failed."
+      message: "Document storage failed."
     });
   });
 });

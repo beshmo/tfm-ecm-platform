@@ -311,7 +311,7 @@ describe("folder use cases", () => {
     ).rejects.toBeInstanceOf(FolderNotEmptyError);
   });
 
-  it("GIVEN a folder has assigned static files WHEN deleted THEN a non-empty folder error is thrown", async () => {
+  it("GIVEN a folder has assigned documents WHEN deleted THEN a non-empty folder error is thrown", async () => {
     const root = createRootFolder(now);
     const folder = createFolderRecord({
       folderId: "FLD-folder1" as FolderId,

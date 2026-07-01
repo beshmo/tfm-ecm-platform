@@ -238,11 +238,11 @@ async function createApp(): Promise<INestApplication> {
     .overrideProvider(CONTENT_TYPE_SCHEMA_READER)
     .useValue(
       new InMemoryContentTypeSchemaReader([
-        schema("article", "1.0", { title: { type: "string", required: true } }),
-        schema("article", "2.0", {
-          title: { type: "string", required: true },
-          priority: { type: "integer", required: true }
-        })
+        schema("article", "1.0", [{ name: "title", type: "string", required: true }]),
+        schema("article", "2.0", [
+          { name: "title", type: "string", required: true },
+          { name: "priority", type: "integer", required: true }
+        ])
       ])
     )
     .compile();

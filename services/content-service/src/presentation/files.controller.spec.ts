@@ -7,7 +7,7 @@ import type { StaticFileStorage, StaticFileStorageSaveInput } from "../domain/st
 import { AppModule } from "./app.module";
 import { STATIC_FILE_STORAGE } from "./folder.providers";
 
-describe("content-service static file management endpoints", () => {
+describe("content-service document management endpoints", () => {
   let app: INestApplication | null = null;
   let storage: MemoryStaticFileStorage;
 
@@ -16,7 +16,7 @@ describe("content-service static file management endpoints", () => {
     app = null;
   });
 
-  it("GIVEN a file is uploaded WHEN listed and retrieved THEN static file metadata is returned", async () => {
+  it("GIVEN a document is uploaded WHEN listed and retrieved THEN document metadata is returned", async () => {
     app = await createApp();
     const uploaded = await uploadFile(app);
 

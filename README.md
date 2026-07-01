@@ -38,7 +38,7 @@ Object Type
        `-- User content types (e.g. generic) -> content record instances
 ```
 
-`Document Type` is the domain term for binary content objects with a stored content stream; existing static-file storage and file routes remain as compatibility details. `Content Type Definition` is the common parent of every user-defined content type. See [Architecture](docs/architecture.md) for the full object-type model and its CMIS projection.
+`Document Type` is the domain term for binary content objects with a stored content stream; existing file storage and file routes remain as compatibility details. `Content Type Definition` is the common parent of every user-defined content type. See [Architecture](docs/architecture.md) for the full object-type model and its CMIS projection.
 
 ## Documentation
 
@@ -68,7 +68,7 @@ Detailed technical documentation lives in the `docs` directory:
 | Schema definition | YAML |
 | Content definition | YAML |
 
-REST will be the initial and primary API style. CMIS 1.1 Browser Binding support is planned as a standards-based compatibility layer over the Management Stage, not as a replacement for ECMP's native REST APIs. It maps folders to `cmis:folder`, static files to `cmis:document`, and structured content records to `cmis:item` descendants, exposing each object-type definition with the CMIS 1.1 common object-type attributes. GraphQL may be considered later as a future enhancement.
+REST will be the initial and primary API style. CMIS 1.1 Browser Binding support is planned as a standards-based compatibility layer over the Management Stage, not as a replacement for ECMP's native REST APIs. It maps folders to `cmis:folder`, documents to `cmis:document`, and structured content records to `cmis:item` descendants, exposing each object-type definition with the CMIS 1.1 common object-type attributes. GraphQL may be considered later as a future enhancement.
 
 ## Required Applications and Tools
 
@@ -199,7 +199,7 @@ ecmp-platform/
 * Implement hierarchical folder management.
 * Implement content CRUD operations.
 * Connect the Management Frontend to content CRUD APIs.
-* Implement file metadata management.
+* Implement document metadata management.
 * Store binary files in the filesystem.
 * Add frontend unit and integration tests for content management.
 

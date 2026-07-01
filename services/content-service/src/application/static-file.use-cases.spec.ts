@@ -23,7 +23,7 @@ import {
   UploadStaticFileUseCase
 } from "./static-file.use-cases";
 
-describe("static file use cases", () => {
+describe("document use cases", () => {
   const now = new Date("2026-06-30T10:00:00.000Z");
   const later = new Date("2026-06-30T11:00:00.000Z");
 

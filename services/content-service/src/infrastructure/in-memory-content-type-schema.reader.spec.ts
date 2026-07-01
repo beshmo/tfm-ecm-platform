@@ -34,7 +34,7 @@ describe("in-memory content type schema reader", () => {
     ]);
 
     const schemas = await reader.listActive();
-    schemas[0]!.fields["title"]!.required = false;
+    schemas[0]!.fields[0]!.required = false;
 
     expect(schemas.map((item) => `${item.name}:${item.version}`)).toEqual([
       "article:2.0",
@@ -42,7 +42,7 @@ describe("in-memory content type schema reader", () => {
       "landing-page:1.0"
     ]);
     await expect(reader.findByNameAndVersion("article", "2.0")).resolves.toMatchObject({
-      fields: { title: { required: true } }
+      fields: [{ name: "title", required: true }]
     });
   });
 
@@ -57,11 +57,11 @@ describe("in-memory content type schema reader", () => {
     const reader = new InMemoryContentTypeSchemaReader([schema("article", "1.0")]);
 
     const firstRead = await reader.findByNameAndVersion("article", "1.0");
-    firstRead!.fields["title"]!.required = false;
+    firstRead!.fields[0]!.required = false;
 
     const secondRead = await reader.findByNameAndVersion("article", "1.0");
 
-    expect(secondRead?.fields["title"]?.required).toBe(true);
+    expect(secondRead?.fields[0]?.required).toBe(true);
   });
 });
 
@@ -69,11 +69,12 @@ function schema(name: string, version: string) {
   return {
     name,
     version,
-    fields: {
-      title: {
+    fields: [
+      {
+        name: "title",
         type: "string" as const,
         required: true
       }
-    }
+    ]
   };
 }

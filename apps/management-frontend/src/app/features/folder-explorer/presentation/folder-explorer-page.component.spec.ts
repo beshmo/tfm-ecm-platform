@@ -125,10 +125,10 @@ describe("folder explorer page component", () => {
     const articleSchema: ContentTypeSchemaDefinition = {
       name: "article",
       version: "1.0",
-      fields: {
-        headline: { type: "string", required: true },
-        priority: { type: "integer", required: false }
-      }
+      fields: [
+        { name: "headline", type: "string", required: true },
+        { name: "priority", type: "integer", required: false }
+      ]
     };
     contentTypeApi.listSchemas.mockResolvedValueOnce([
       { name: "generic", version: "1.0", active: true },
@@ -153,6 +153,7 @@ describe("folder explorer page component", () => {
     expect(contentTypeApi.getLatestSchema).toHaveBeenLastCalledWith("article");
     expect(component.selectedContentTypeName).toBe("article");
     expect(component.formData).toEqual({ headline: "", priority: null });
+    expect(articleFields.map((field) => field.name)).toEqual(["headline", "priority"]);
     expect(articleFields).not.toBe(genericFields);
     expect(component.schemaFields).toBe(articleFields);
   });
@@ -209,7 +210,7 @@ describe("folder explorer page component", () => {
     expect(component.fileErrorMessage).toBe("Choose a file to upload.");
   });
 
-  it("renames a static file and refreshes the selected folder", async () => {
+  it("renames a document and refreshes the selected folder", async () => {
     const component = createComponent();
     await component.loadWorkspace(ROOT_FOLDER_ID);
     vi.stubGlobal("prompt", vi.fn().mockReturnValue("renamed.pdf"));
@@ -221,7 +222,7 @@ describe("folder explorer page component", () => {
     vi.unstubAllGlobals();
   });
 
-  it("deletes a static file after confirmation", async () => {
+  it("deletes a document after confirmation", async () => {
     const component = createComponent();
     await component.loadWorkspace(ROOT_FOLDER_ID);
     vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
@@ -237,14 +238,14 @@ describe("folder explorer page component", () => {
     const component = createComponent();
     staticFileApi.uploadFile.mockRejectedValueOnce({
       status: 415,
-      message: "Static file MIME type is not supported."
+      message: "Document MIME type is not supported."
     });
     await component.loadWorkspace(ROOT_FOLDER_ID);
 
     component.selectedUploadFile = new File(["content"], "app.exe");
     await component.uploadSelectedFile();
 
-    expect(component.fileErrorMessage).toBe("Static file MIME type is not supported.");
+    expect(component.fileErrorMessage).toBe("Document MIME type is not supported.");
   });
 
   it("keeps form data visible when backend validation fails", async () => {

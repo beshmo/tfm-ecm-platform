@@ -7,12 +7,12 @@ describe("content instance validation domain", () => {
   const schema: ContentTypeSchemaDefinition = {
     name: "article",
     version: "1.0",
-    fields: {
-      title: { type: "string", required: true },
-      priority: { type: "integer", required: false },
-      publishDate: { type: "date", required: false },
-      publishTime: { type: "time", required: false }
-    }
+    fields: [
+      { name: "title", type: "string", required: true },
+      { name: "priority", type: "integer", required: false },
+      { name: "publishDate", type: "date", required: false },
+      { name: "publishTime", type: "time", required: false }
+    ]
   };
 
   it("GIVEN a valid content instance WHEN it is validated THEN it returns valid", () => {
