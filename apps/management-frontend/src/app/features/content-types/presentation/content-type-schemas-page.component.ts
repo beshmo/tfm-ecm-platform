@@ -24,7 +24,17 @@ interface SchemaDraft {
   fields: SchemaFieldDraft[];
 }
 
-const FIELD_TYPES: readonly ContentFieldType[] = ["string", "integer", "date", "time"];
+const FIELD_TYPES: readonly ContentFieldType[] = [
+  "string",
+  "integer",
+  "date",
+  "time",
+  "boolean",
+  "datetime",
+  "decimal",
+  "html",
+  "uri"
+];
 
 @Component({
   selector: "ecmp-content-type-schemas-page",

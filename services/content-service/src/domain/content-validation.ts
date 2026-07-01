@@ -9,6 +9,9 @@ import type {
 const FORBIDDEN_FIELD_NAMES = new Set(["__proto__", "prototype", "constructor"]);
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/;
+// Timezone-aware RFC 3339 timestamp requiring an explicit `Z` or numeric offset.
+const DATETIME_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
 
 export function validateContentInstanceData(
   schema: ContentTypeSchemaDefinition,
@@ -110,6 +113,22 @@ function validateFieldValue(
       return typeof value === "string" && TIME_PATTERN.test(value)
         ? null
         : buildTypeError(fieldName, fieldType);
+    case "boolean":
+      return typeof value === "boolean" ? null : buildTypeError(fieldName, fieldType);
+    case "datetime":
+      return typeof value === "string" && isValidTimezoneAwareDatetime(value)
+        ? null
+        : buildTypeError(fieldName, fieldType);
+    case "decimal":
+      return typeof value === "number" && Number.isFinite(value)
+        ? null
+        : buildTypeError(fieldName, fieldType);
+    case "html":
+      return typeof value === "string" ? null : buildTypeError(fieldName, fieldType);
+    case "uri":
+      return typeof value === "string" && isAbsoluteUri(value)
+        ? null
+        : buildTypeError(fieldName, fieldType);
   }
 }
 
@@ -131,6 +150,20 @@ function buildTypeError(fieldName: string, fieldType: ContentFieldType): Content
         "INVALID_TIME",
         `${fieldName} must be a valid time using HH:mm:ss format.`
       );
+    case "boolean":
+      return buildError(fieldName, "INVALID_BOOLEAN", `${fieldName} must be a boolean.`);
+    case "datetime":
+      return buildError(
+        fieldName,
+        "INVALID_DATETIME",
+        `${fieldName} must be a timestamp with an explicit timezone offset or Z designator.`
+      );
+    case "decimal":
+      return buildError(fieldName, "INVALID_DECIMAL", `${fieldName} must be a finite number.`);
+    case "html":
+      return buildError(fieldName, "INVALID_HTML", `${fieldName} must be a string.`);
+    case "uri":
+      return buildError(fieldName, "INVALID_URI", `${fieldName} must be an absolute URI.`);
   }
 }
 
@@ -165,4 +198,22 @@ function isValidIsoDate(value: string): boolean {
     date.getUTCMonth() === month - 1 &&
     date.getUTCDate() === day
   );
+}
+
+function isValidTimezoneAwareDatetime(value: string): boolean {
+  // Require an explicit timezone designator and a real calendar timestamp.
+  return DATETIME_PATTERN.test(value) && !Number.isNaN(Date.parse(value));
+}
+
+// A `uri` value must be a syntactically valid absolute URI. The platform URL
+// parser accepts any absolute URI scheme (for example `http:`, `https:`,
+// `ftp:`, or `mailto:`) and rejects scheme-less or relative references, which
+// keeps the field type meaningfully stronger than a plain `string`.
+function isAbsoluteUri(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
 }

@@ -160,14 +160,34 @@ type EditorMode = "create" | "edit";
         </label>
 
         <form *ngIf="currentSchema" (ngSubmit)="submitEditor()">
-          <label *ngFor="let field of schemaFields; trackBy: trackSchemaField">
+          <label
+            *ngFor="let field of schemaFields; trackBy: trackSchemaField"
+            [class.boolean-field]="field.definition.type === 'boolean'"
+          >
             {{ field.name }}
-            <input
-              [type]="inputType(field.definition.type)"
-              [(ngModel)]="formData[field.name]"
-              [required]="field.definition.required"
-              [name]="field.name"
-            />
+            <ng-container [ngSwitch]="field.definition.type">
+              <input
+                *ngSwitchCase="'boolean'"
+                type="checkbox"
+                [(ngModel)]="formData[field.name]"
+                [name]="field.name"
+              />
+              <textarea
+                *ngSwitchCase="'html'"
+                [(ngModel)]="formData[field.name]"
+                [required]="field.definition.required"
+                [name]="field.name"
+                rows="4"
+              ></textarea>
+              <input
+                *ngSwitchDefault
+                [type]="inputType(field.definition.type)"
+                [step]="field.definition.type === 'decimal' ? 'any' : null"
+                [(ngModel)]="formData[field.name]"
+                [required]="field.definition.required"
+                [name]="field.name"
+              />
+            </ng-container>
           </label>
 
           <p *ngIf="formErrorMessage" class="error">{{ formErrorMessage }}</p>
@@ -313,9 +333,25 @@ type EditorMode = "create" | "edit";
       }
 
       input,
-      select {
+      select,
+      textarea {
         border: 1px solid #b8c2cc;
         padding: 0.5rem;
+      }
+
+      textarea {
+        font: inherit;
+        resize: vertical;
+      }
+
+      .boolean-field {
+        align-items: center;
+        grid-auto-flow: column;
+        justify-content: start;
+      }
+
+      .boolean-field input {
+        justify-self: start;
       }
 
       @media (max-width: 760px) {
@@ -349,7 +385,7 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
   selectedContentTypeName: ContentTypeName | "" = "";
   private _currentSchema: ContentTypeSchemaDefinition | null = null;
   schemaFields: SchemaFieldView[] = [];
-  formData: Record<string, string | number | null> = {};
+  formData: EditorFormData = {};
   errorMessage = "";
   fileErrorMessage = "";
   formErrorMessage = "";
@@ -638,7 +674,7 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
   }
 
   inputType(fieldType: ContentFieldType): string {
-    if (fieldType === "integer") {
+    if (fieldType === "integer" || fieldType === "decimal") {
       return "number";
     }
 
@@ -646,6 +682,12 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
       return fieldType;
     }
 
+    if (fieldType === "uri") {
+      return "url";
+    }
+
+    // `datetime` uses a plain text control so the author-entered timezone
+    // designator is preserved; `datetime-local` would strip the offset.
     return "text";
   }
 
@@ -694,41 +736,75 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
   }
 }
 
-function createEmptyFormData(
-  schema: ContentTypeSchemaDefinition
-): Record<string, string | number | null> {
+type FormFieldValue = string | number | boolean | null;
+type EditorFormData = Record<string, FormFieldValue>;
+
+function emptyValueForType(fieldType: ContentFieldType): FormFieldValue {
+  if (fieldType === "boolean") {
+    return false;
+  }
+
+  if (fieldType === "integer" || fieldType === "decimal") {
+    return null;
+  }
+
+  return "";
+}
+
+function createEmptyFormData(schema: ContentTypeSchemaDefinition): EditorFormData {
   return Object.fromEntries(
-    schema.fields.map((field) => [field.name, field.type === "integer" ? null : ""])
+    schema.fields.map((field) => [field.name, emptyValueForType(field.type)])
   );
 }
 
 function createFormData(
   schema: ContentTypeSchemaDefinition,
   data: Record<string, unknown>
-): Record<string, string | number | null> {
+): EditorFormData {
   return Object.fromEntries(
     schema.fields.map((field) => {
       const value = data[field.name];
 
-      return [field.name, typeof value === "string" || typeof value === "number" ? value : ""];
+      if (
+        typeof value === "string" ||
+        typeof value === "number" ||
+        typeof value === "boolean"
+      ) {
+        return [field.name, value];
+      }
+
+      return [field.name, emptyValueForType(field.type)];
     })
   );
 }
 
 function toContentData(
   schema: ContentTypeSchemaDefinition,
-  formData: Record<string, string | number | null>
+  formData: EditorFormData
 ): Record<string, unknown> {
   const data: Record<string, unknown> = {};
 
   for (const field of schema.fields) {
     const value = formData[field.name];
 
+    // Booleans always submit a JSON boolean; an unchecked control is `false`.
+    if (field.type === "boolean") {
+      data[field.name] = value === true;
+      continue;
+    }
+
     if (value === "" || value === null) {
       continue;
     }
 
-    data[field.name] = field.type === "integer" ? Number(value) : value;
+    if (field.type === "integer" || field.type === "decimal") {
+      data[field.name] = Number(value);
+      continue;
+    }
+
+    // `datetime`, `uri`, and `html` submit their entered text unchanged so the
+    // timezone designator and raw HTML source reach backend validation intact.
+    data[field.name] = value;
   }
 
   return data;

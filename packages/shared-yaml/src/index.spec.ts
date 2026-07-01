@@ -165,6 +165,33 @@ fields:
     }
   });
 
+  it("GIVEN extended field types WHEN a schema is parsed THEN they are accepted in field order", () => {
+    const schema = parser.parse(`
+name: article
+version: 1.0
+fields:
+  - name: featured
+    type: boolean
+    required: true
+  - name: publishMoment
+    type: datetime
+  - name: rating
+    type: decimal
+  - name: body
+    type: html
+  - name: canonicalUrl
+    type: uri
+`);
+
+    expect(schema.fields).toEqual([
+      { name: "featured", type: "boolean", required: true },
+      { name: "publishMoment", type: "datetime", required: false },
+      { name: "rating", type: "decimal", required: false },
+      { name: "body", type: "html", required: false },
+      { name: "canonicalUrl", type: "uri", required: false }
+    ]);
+  });
+
   it("GIVEN an unsupported field type WHEN it is parsed THEN it rejects the field", () => {
     expect(() =>
       parser.parse(`

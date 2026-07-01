@@ -114,6 +114,40 @@ describe("content type schemas page integration", () => {
     expect(generatedYaml).toContain("- name: priority\n    type: integer\n    required: false");
   });
 
+  it("includes a selected extended field type in the generated create YAML", async () => {
+    const fixture = await renderPage();
+
+    setInputValue(fixture, "createSchemaName", "article");
+    setInputValue(fixture, "createFieldName-0", "featured");
+    setSelectValue(fixture, "createFieldType-0", "boolean");
+    clickButton(fixture, "Create schema");
+    await settle(fixture);
+
+    const generatedYaml = contentTypeApi.createSchema.mock.calls[0]?.[0] as string;
+
+    expect(generatedYaml).toContain("- name: featured\n    type: boolean\n    required: true");
+  });
+
+  it("preserves an existing extended field type through the replacement draft", async () => {
+    definitions.set(schemaKey("generic", "1.0"), {
+      name: "generic",
+      version: "1.0",
+      fields: [{ name: "publishMoment", type: "datetime", required: false }]
+    });
+    const fixture = await renderPage();
+
+    expect(selectValue(fixture, "replaceFieldType-0")).toBe("datetime");
+
+    clickButton(fixture, "Replace schema");
+    await settle(fixture);
+
+    expect(contentTypeApi.replaceSchemaVersion).toHaveBeenCalledWith(
+      "generic",
+      "1.0",
+      expect.stringContaining("type: datetime")
+    );
+  });
+
   it("preserves the create draft and shows backend validation feedback", async () => {
     contentTypeApi.createSchema.mockRejectedValueOnce({
       status: 400,
@@ -294,11 +328,10 @@ function setInputValue(
   fixture.detectChanges();
 }
 
-function setSelectValue(
+function select(
   fixture: ComponentFixture<ContentTypeSchemasPageComponent>,
-  name: string,
-  value: string
-): void {
+  name: string
+): HTMLSelectElement {
   const element = fixture.nativeElement.querySelector(
     `select[name="${name}"], select[data-name="${name}"]`
   ) as HTMLSelectElement | null;
@@ -306,6 +339,23 @@ function setSelectValue(
   if (!element) {
     throw new Error(`Select ${name} was not found.`);
   }
+
+  return element;
+}
+
+function selectValue(
+  fixture: ComponentFixture<ContentTypeSchemasPageComponent>,
+  name: string
+): string {
+  return select(fixture, name).value;
+}
+
+function setSelectValue(
+  fixture: ComponentFixture<ContentTypeSchemasPageComponent>,
+  name: string,
+  value: string
+): void {
+  const element = select(fixture, name);
 
   element.value = value;
   element.dispatchEvent(new Event("change"));
