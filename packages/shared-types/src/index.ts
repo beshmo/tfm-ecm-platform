@@ -233,16 +233,45 @@ export interface CmisPropertyDefinition {
   updatability: "readonly" | "readwrite";
 }
 
+/**
+ * CMIS 1.1 base type namespace used for the CMIS-standard base object types.
+ */
+export const CMIS_CORE_NAMESPACE = "http://docs.oasis-open.org/ns/cmis/core/200908/";
+
+/**
+ * Local namespace for ECMP-owned CMIS custom object types.
+ */
+export const CMIS_TYPE_LOCAL_NAMESPACE = "https://ecmp.local/cmis/types";
+
+/**
+ * Type mutability flags required by CMIS 1.1 common object-type attributes.
+ * ECMP does not support CMIS type management, so all flags are conservatively `false`.
+ */
+export interface CmisTypeMutability {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+}
+
 export interface CmisTypeDefinition {
   id: CmisObjectTypeId;
   localName: string;
+  localNamespace: string;
+  queryName: string;
   displayName: string;
+  description: string;
   baseId: CmisBaseTypeId;
-  queryable: boolean;
+  parentId: CmisObjectTypeId | null;
   creatable: boolean;
   fileable: boolean;
+  queryable: boolean;
+  controllablePolicy: boolean;
+  controllableACL: boolean;
+  fulltextIndexed: boolean;
+  includedInSupertypeQuery: boolean;
   versionable: boolean;
   contentStreamAllowed: "notallowed" | "allowed" | "required";
+  typeMutability: CmisTypeMutability;
   propertyDefinitions: CmisPropertyDefinition[];
 }
 
@@ -343,31 +372,52 @@ export function cmisBaseTypeDefinitions(): CmisTypeDefinition[] {
     {
       id: "cmis:folder",
       localName: "folder",
+      queryName: "cmis:folder",
       displayName: "Folder",
+      description: "ECMP folder object type.",
       baseId: "cmis:folder",
-      queryable: false,
+      parentId: null,
       creatable: true,
       fileable: true,
       versionable: false,
       contentStreamAllowed: "notallowed",
+      ...commonTypeAttributes(CMIS_CORE_NAMESPACE),
       propertyDefinitions: commonPropertyDefinitions()
     },
     {
       id: "cmis:document",
       localName: "document",
+      queryName: "cmis:document",
       displayName: "Document",
+      description: "ECMP static file document object type.",
       baseId: "cmis:document",
-      queryable: false,
+      parentId: null,
       creatable: true,
       fileable: true,
       versionable: false,
       contentStreamAllowed: "required",
+      ...commonTypeAttributes(CMIS_CORE_NAMESPACE),
       propertyDefinitions: [
         ...commonPropertyDefinitions(),
         propertyDefinition("cmis:contentStreamLength", "Content Stream Length", "integer", true),
         propertyDefinition("cmis:contentStreamMimeType", "Content Stream MIME Type", "string", true),
         propertyDefinition("cmis:contentStreamFileName", "Content Stream File Name", "string", true)
       ]
+    },
+    {
+      id: "cmis:item",
+      localName: "item",
+      queryName: "cmis:item",
+      displayName: "Item",
+      description: "ECMP structured content record base object type.",
+      baseId: "cmis:item",
+      parentId: null,
+      creatable: false,
+      fileable: true,
+      versionable: false,
+      contentStreamAllowed: "notallowed",
+      ...commonTypeAttributes(CMIS_CORE_NAMESPACE),
+      propertyDefinitions: commonPropertyDefinitions()
     }
   ];
 }
@@ -378,13 +428,16 @@ export function cmisTypeDefinitionFromSchema(
   return {
     id: cmisTypeIdForContentType(schema.name),
     localName: schema.name,
+    queryName: cmisTypeIdForContentType(schema.name),
     displayName: schema.name,
+    description: `ECMP ${schema.name} content record type.`,
     baseId: "cmis:item",
-    queryable: false,
+    parentId: "cmis:item",
     creatable: false,
     fileable: true,
     versionable: false,
     contentStreamAllowed: "notallowed",
+    ...commonTypeAttributes(CMIS_TYPE_LOCAL_NAMESPACE),
     propertyDefinitions: [
       ...commonPropertyDefinitions(),
       propertyDefinition("ecmp:schemaVersion", "Schema Version", "string", true),
@@ -531,6 +584,29 @@ export function cmisAllowableActions(
 
 export function cmisError(exception: CmisErrorCode, message: string): CmisErrorResponse {
   return { exception, message };
+}
+
+function commonTypeAttributes(
+  localNamespace: string
+): Pick<
+  CmisTypeDefinition,
+  | "localNamespace"
+  | "queryable"
+  | "controllablePolicy"
+  | "controllableACL"
+  | "fulltextIndexed"
+  | "includedInSupertypeQuery"
+  | "typeMutability"
+> {
+  return {
+    localNamespace,
+    queryable: false,
+    controllablePolicy: false,
+    controllableACL: false,
+    fulltextIndexed: false,
+    includedInSupertypeQuery: false,
+    typeMutability: { create: false, update: false, delete: false }
+  };
 }
 
 function commonPropertyDefinitions(): CmisPropertyDefinition[] {

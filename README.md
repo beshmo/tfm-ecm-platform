@@ -54,7 +54,7 @@ Detailed technical documentation lives in the `docs` directory:
 | Schema definition | YAML |
 | Content definition | YAML |
 
-REST will be the initial and primary API style. CMIS 1.1 Browser Binding support is planned as a standards-based compatibility layer over the Management Stage, not as a replacement for ECMP's native REST APIs. GraphQL may be considered later as a future enhancement.
+REST will be the initial and primary API style. CMIS 1.1 Browser Binding support is planned as a standards-based compatibility layer over the Management Stage, not as a replacement for ECMP's native REST APIs. It maps folders to `cmis:folder`, static files to `cmis:document`, and structured content records to `cmis:item` descendants, exposing each object-type definition with the CMIS 1.1 common object-type attributes. GraphQL may be considered later as a future enhancement.
 
 ## Required Applications and Tools
 

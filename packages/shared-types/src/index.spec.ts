@@ -29,6 +29,7 @@ import type {
 import {
   CMIS_REPOSITORY_ID,
   CMIS_SUPPORTED_OPERATIONS,
+  CMIS_TYPE_LOCAL_NAMESPACE,
   INITIAL_GENERIC_CONTENT_TYPE_SCHEMA,
   ROOT_FOLDER_ID,
   cmisBaseTypeDefinitions,
@@ -284,12 +285,14 @@ describe("shared types", () => {
       }
     });
 
-    expect(baseTypes.map((type) => type.id)).toEqual(["cmis:folder", "cmis:document"]);
+    expect(baseTypes.map((type) => type.id)).toEqual(["cmis:folder", "cmis:document", "cmis:item"]);
     expect(cmisTypeIdForContentType("article")).toBe("ecmp:article");
     expect(contentTypeFromCmisTypeId("ecmp:article")).toBe("article");
     expect(articleType).toMatchObject({
       id: "ecmp:article",
       baseId: "cmis:item",
+      parentId: "cmis:item",
+      localNamespace: CMIS_TYPE_LOCAL_NAMESPACE,
       contentStreamAllowed: "notallowed"
     });
     expect(articleType.propertyDefinitions).toEqual(
@@ -298,6 +301,55 @@ describe("shared types", () => {
         expect.objectContaining({ id: "ecmp:priority", required: false, propertyType: "integer" })
       ])
     );
+  });
+
+  it("GIVEN CMIS base type discovery WHEN listed THEN it includes cmis:item and excludes unsupported optional base types", () => {
+    const baseTypeIds = cmisBaseTypeDefinitions().map((type) => type.id);
+
+    expect(baseTypeIds).toContain("cmis:item");
+    expect(baseTypeIds).not.toContain("cmis:relationship");
+    expect(baseTypeIds).not.toContain("cmis:policy");
+    expect(baseTypeIds).not.toContain("cmis:secondary");
+  });
+
+  it("GIVEN any CMIS type definition WHEN returned THEN it exposes the CMIS 1.1 common object-type attributes with conservative flags", () => {
+    const definitions = [
+      ...cmisBaseTypeDefinitions(),
+      cmisTypeDefinitionFromSchema({
+        name: "article",
+        version: "1.0",
+        fields: { title: { type: "string", required: true } }
+      })
+    ];
+
+    for (const definition of definitions) {
+      expect(definition).toEqual(
+        expect.objectContaining({
+          id: expect.any(String),
+          localName: expect.any(String),
+          localNamespace: expect.any(String),
+          queryName: expect.any(String),
+          displayName: expect.any(String),
+          description: expect.any(String),
+          baseId: expect.any(String),
+          creatable: expect.any(Boolean),
+          fileable: expect.any(Boolean),
+          queryable: false,
+          controllablePolicy: false,
+          controllableACL: false,
+          fulltextIndexed: false,
+          includedInSupertypeQuery: false,
+          typeMutability: { create: false, update: false, delete: false }
+        })
+      );
+      expect(definition).toHaveProperty("parentId");
+    }
+  });
+
+  it("GIVEN CMIS base types WHEN inspected THEN base type parent identifiers are null", () => {
+    for (const baseType of cmisBaseTypeDefinitions()) {
+      expect(baseType.parentId).toBeNull();
+    }
   });
 
   it("GIVEN ECMP resources WHEN mapped to CMIS THEN object representations include properties and allowable actions", () => {
