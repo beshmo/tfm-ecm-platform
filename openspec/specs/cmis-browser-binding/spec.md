@@ -27,49 +27,61 @@ The system SHALL route `/api/cmis` requests through the API Gateway to the CMIS 
 - **THEN** it forwards the method, path, query, headers required for parsing, and request body to the CMIS adapter
 
 ### Requirement: CMIS type definitions map ECMP platform types
-The system SHALL expose CMIS type definitions for ECMP folders, static files, and supported structured content records.
+The system SHALL expose CMIS type definitions projected from ECMP object-type definitions for ECMP folders, documents, and supported structured content records.
 
 #### Scenario: List base type children
 - **WHEN** a client requests CMIS type children for the repository root type scope
-- **THEN** the system returns type definitions including `cmis:folder`, `cmis:document`, `cmis:item`, and supported ECMP custom types
+- **THEN** the system returns type definitions including `cmis:folder`, `cmis:document`, `cmis:item`, `ecmp:content-type-definition`, and supported ECMP user content types
 
-#### Scenario: Map content type schema to custom type
-- **WHEN** an active ECMP content type schema is exposed through CMIS type discovery
-- **THEN** the system maps the schema to a stable CMIS custom type identifier with `cmis:item` as its parent type and exposes supported field definitions as CMIS properties
+#### Scenario: Map folder type definition
+- **WHEN** the ECMP Folder Type is exposed through CMIS type discovery
+- **THEN** the system maps it to the `cmis:folder` object-type definition
+
+#### Scenario: Map document type definition
+- **WHEN** the ECMP Document Type is exposed through CMIS type discovery
+- **THEN** the system maps it to the `cmis:document` object-type definition with required content stream metadata
+
+#### Scenario: Map content type definition parent
+- **WHEN** the ECMP Content Type Definition parent is exposed through CMIS type discovery
+- **THEN** the system maps it to `ecmp:content-type-definition` with base type `cmis:item` and parent type `cmis:item`
+
+#### Scenario: Map user content type schema to custom type
+- **WHEN** an active ECMP user content type schema is exposed through CMIS type discovery
+- **THEN** the system maps the schema to a stable CMIS custom type identifier with base type `cmis:item`, parent type `ecmp:content-type-definition`, and supported field definitions as CMIS properties
 
 #### Scenario: Do not advertise unsupported optional base types
-- **WHEN** a client requests CMIS type children for the repository root type scope
-- **THEN** the system does not return `cmis:relationship`, `cmis:policy`, or `cmis:secondary` unless ECMP supports the corresponding CMIS behavior
+- **WHEN** CMIS type discovery returns base and custom type definitions
+- **THEN** the system does not advertise `cmis:relationship`, `cmis:policy`, or `cmis:secondary`
 
-### Requirement: CMIS object-type definitions expose common attributes
-The system SHALL include the CMIS 1.1 common object-type attributes on every returned CMIS object-type definition.
+### Requirement: CMIS object-type definitions include common attributes
+The system SHALL include CMIS 1.1 common object-type attributes on every CMIS type definition returned by the ECMP CMIS adapter.
 
-#### Scenario: Base type definition includes common attributes
-- **WHEN** the system returns a CMIS base object-type definition
-- **THEN** the definition includes `id`, `localName`, `localNamespace`, `queryName`, `displayName`, `baseId`, `parentId`, `description`, `creatable`, `fileable`, `queryable`, `controllablePolicy`, `controllableACL`, `fulltextIndexed`, `includedInSupertypeQuery`, and `typeMutability`
+#### Scenario: Common attributes are returned for built-in types
+- **WHEN** CMIS type discovery returns `cmis:folder`, `cmis:document`, `cmis:item`, or `ecmp:content-type-definition`
+- **THEN** each type definition includes `id`, `localName`, `localNamespace`, `queryName`, `displayName`, `baseId`, `parentId`, `description`, `creatable`, `fileable`, `queryable`, `controllablePolicy`, `controllableACL`, `fulltextIndexed`, `includedInSupertypeQuery`, and `typeMutability`
 
-#### Scenario: Custom content type definition includes common attributes
-- **WHEN** the system returns a CMIS type definition for an ECMP content type schema
-- **THEN** the definition includes all common object-type attributes and sets `baseId` to `cmis:item` and `parentId` to `cmis:item`
+#### Scenario: Common attributes are returned for user content types
+- **WHEN** CMIS type discovery returns a user content type such as `ecmp:generic`
+- **THEN** the type definition includes all common object-type attributes and uses `parentId` equal to `ecmp:content-type-definition`
 
-#### Scenario: Unsupported behavior flags are conservative
-- **WHEN** the system returns CMIS object-type definitions while query, policy, ACL mutation, and type management services are unsupported
-- **THEN** the returned type definitions set `queryable`, `controllablePolicy`, `controllableACL`, `fulltextIndexed`, `includedInSupertypeQuery`, and all `typeMutability` flags to `false`
+#### Scenario: Unsupported behavior flags remain conservative
+- **WHEN** common CMIS object-type attributes are returned
+- **THEN** unsupported query, policy, ACL, full-text, and type mutability flags are set to false
 
 ### Requirement: CMIS objects map ECMP resources
-The system SHALL map ECMP resource metadata into CMIS object representations.
+The system SHALL map ECMP resource metadata into CMIS object representations using each resource's concrete ECMP object type.
 
 #### Scenario: Map folder object
 - **WHEN** a CMIS response includes an ECMP folder
 - **THEN** the object has base type `cmis:folder`, object ID equal to the folder ID, name equal to the folder name or `/` for root, and parent metadata matching the folder hierarchy
 
-#### Scenario: Map static file object
-- **WHEN** a CMIS response includes an ECMP static file
-- **THEN** the object has base type `cmis:document`, object ID equal to the static file ID, name equal to the filename, and content stream metadata from the stored file metadata
+#### Scenario: Map document object
+- **WHEN** a CMIS response includes an ECMP document backed by stored binary content
+- **THEN** the object has base type `cmis:document`, object ID equal to the document ID, name equal to the filename, and content stream metadata from the stored document metadata
 
 #### Scenario: Map content record object
 - **WHEN** a CMIS response includes an ECMP content record
-- **THEN** the object has a stable CMIS type derived from its content type and includes supported record metadata and schema fields as properties
+- **THEN** the object has a stable CMIS type derived from its user content type and includes supported record metadata and schema fields as properties
 
 ### Requirement: CMIS navigation is supported
 The system SHALL support browsing folders and resolving objects by ID or path.

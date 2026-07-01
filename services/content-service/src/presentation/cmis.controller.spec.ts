@@ -39,21 +39,41 @@ describe("content-service CMIS Browser Binding adapter", () => {
       });
   });
 
-  it("GIVEN CMIS type discovery WHEN requested THEN base and ECMP content types are returned", async () => {
+  it("GIVEN CMIS type discovery WHEN requested THEN base, content type definition, and ECMP content types are returned", async () => {
     app = await createApp();
 
     await request(app.getHttpServer())
       .get(`/api/cmis/${CMIS_REPOSITORY_ID}/types`)
       .expect(200)
       .expect((response) => {
-        const types: Array<{ id: string }> = response.body.types;
+        const types = response.body.types as Array<{
+          id: string;
+          baseId: string;
+          parentId: string | null;
+          displayName: string;
+          typeMutability: { create: boolean; update: boolean; delete: boolean };
+        }>;
 
         expect(types.map((type) => type.id)).toEqual([
           "cmis:folder",
           "cmis:document",
           "cmis:item",
+          "ecmp:content-type-definition",
           "ecmp:generic"
         ]);
+
+        // Binary content uses Document terminology in the object-type model.
+        const documentType = types.find((type) => type.id === "cmis:document");
+        expect(documentType?.displayName).toBe("Document Type");
+
+        // Content Type Definition is the common parent of user content types.
+        const contentTypeDefinition = types.find((type) => type.id === "ecmp:content-type-definition");
+        expect(contentTypeDefinition).toMatchObject({ baseId: "cmis:item", parentId: "cmis:item" });
+        const generic = types.find((type) => type.id === "ecmp:generic");
+        expect(generic).toMatchObject({
+          baseId: "cmis:item",
+          parentId: "ecmp:content-type-definition"
+        });
 
         // Every returned type definition exposes the CMIS 1.1 common object-type
         // attributes with conservative unsupported-behavior flags.
@@ -82,10 +102,6 @@ describe("content-service CMIS Browser Binding adapter", () => {
         expect(typeIds).not.toContain("cmis:relationship");
         expect(typeIds).not.toContain("cmis:policy");
         expect(typeIds).not.toContain("cmis:secondary");
-
-        // The ECMP custom content type descends from cmis:item.
-        const genericType = types.find((type) => type.id === "ecmp:generic");
-        expect(genericType).toMatchObject({ baseId: "cmis:item", parentId: "cmis:item" });
       });
   });
 
