@@ -148,19 +148,19 @@ type EditorMode = "create" | "edit";
         <label *ngIf="editorMode === 'create'">
           Content type
           <select
-            [(ngModel)]="selectedContentTypeName"
-            (change)="chooseSelectedContentType()"
+            [ngModel]="selectedContentTypeName"
+            (ngModelChange)="chooseContentType($event)"
             name="contentType"
           >
             <option value="" disabled>Choose a content type</option>
-            <option *ngFor="let schema of schemas" [value]="schema.name">
+            <option *ngFor="let schema of schemas; trackBy: trackSchemaSummary" [value]="schema.name">
               {{ schema.name }} {{ schema.version }}
             </option>
           </select>
         </label>
 
         <form *ngIf="currentSchema" (ngSubmit)="submitEditor()">
-          <label *ngFor="let field of schemaFields">
+          <label *ngFor="let field of schemaFields; trackBy: trackSchemaField">
             {{ field.name }}
             <input
               [type]="inputType(field.definition.type)"
@@ -347,7 +347,8 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
   editorMode: EditorMode = "create";
   editingContent: ContentRecord | null = null;
   selectedContentTypeName: ContentTypeName | "" = "";
-  currentSchema: ContentTypeSchemaDefinition | null = null;
+  private _currentSchema: ContentTypeSchemaDefinition | null = null;
+  schemaFields: SchemaFieldView[] = [];
   formData: Record<string, string | number | null> = {};
   errorMessage = "";
   fileErrorMessage = "";
@@ -365,8 +366,13 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
     private readonly staticFileApi: StaticFileApiClient
   ) {}
 
-  get schemaFields(): SchemaFieldView[] {
-    return Object.entries(this.currentSchema?.fields ?? {}).map(([name, definition]) => ({
+  get currentSchema(): ContentTypeSchemaDefinition | null {
+    return this._currentSchema;
+  }
+
+  set currentSchema(schema: ContentTypeSchemaDefinition | null) {
+    this._currentSchema = schema;
+    this.schemaFields = Object.entries(schema?.fields ?? {}).map(([name, definition]) => ({
       name,
       definition
     }));
@@ -641,6 +647,14 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
     }
 
     return "text";
+  }
+
+  trackSchemaSummary(_index: number, schema: ContentTypeSchemaSummary): string {
+    return `${schema.name}:${schema.version}`;
+  }
+
+  trackSchemaField(_index: number, field: SchemaFieldView): string {
+    return field.name;
   }
 
   private validateRequiredFields(): boolean {

@@ -2,6 +2,7 @@ import {
   INITIAL_GENERIC_CONTENT_TYPE_SCHEMA,
   ROOT_FOLDER_ID,
   type ContentRecord,
+  type ContentTypeSchemaDefinition,
   type Folder,
   type StaticFile
 } from "@ecmp/shared-types";
@@ -118,6 +119,42 @@ describe("folder explorer page component", () => {
 
     expect(contentTypeApi.getLatestSchema).toHaveBeenCalledTimes(1);
     expect(component.selectedContentTypeName).toBe("generic");
+  });
+
+  it("changes the selected content type without rebuilding schema fields on each read", async () => {
+    const articleSchema: ContentTypeSchemaDefinition = {
+      name: "article",
+      version: "1.0",
+      fields: {
+        headline: { type: "string", required: true },
+        priority: { type: "integer", required: false }
+      }
+    };
+    contentTypeApi.listSchemas.mockResolvedValueOnce([
+      { name: "generic", version: "1.0", active: true },
+      { name: "article", version: "1.0", active: true }
+    ]);
+    contentTypeApi.getLatestSchema.mockImplementation((name: string) =>
+      Promise.resolve(name === "article" ? articleSchema : INITIAL_GENERIC_CONTENT_TYPE_SCHEMA)
+    );
+    const component = createComponent();
+    await component.loadWorkspace(ROOT_FOLDER_ID);
+
+    await component.openCreate();
+
+    const genericFields = component.schemaFields;
+
+    expect(component.schemaFields).toBe(genericFields);
+
+    await component.chooseContentType("article");
+
+    const articleFields = component.schemaFields;
+
+    expect(contentTypeApi.getLatestSchema).toHaveBeenLastCalledWith("article");
+    expect(component.selectedContentTypeName).toBe("article");
+    expect(component.formData).toEqual({ headline: "", priority: null });
+    expect(articleFields).not.toBe(genericFields);
+    expect(component.schemaFields).toBe(articleFields);
   });
 
   it("edits content with the stored schema version and refreshes the list", async () => {
