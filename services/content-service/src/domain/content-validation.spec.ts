@@ -173,4 +173,108 @@ describe("content instance validation domain", () => {
       }
     ]);
   });
+
+  describe("extended field types", () => {
+    const extendedSchema: ContentTypeSchemaDefinition = {
+      name: "article",
+      version: "1.0",
+      fields: [
+        { name: "featured", type: "boolean", required: false },
+        { name: "publishMoment", type: "datetime", required: false },
+        { name: "rating", type: "decimal", required: false },
+        { name: "body", type: "html", required: false },
+        { name: "canonicalUrl", type: "uri", required: false }
+      ]
+    };
+
+    it("GIVEN valid extended field values WHEN validated THEN validation succeeds", () => {
+      const result = validateContentInstanceData(extendedSchema, {
+        featured: true,
+        publishMoment: "2026-07-01T14:30:00+02:00",
+        rating: 4.5,
+        body: "<p>Hello</p>",
+        canonicalUrl: "https://example.com/article"
+      });
+
+      expect(result).toEqual({ valid: true, errors: [] });
+    });
+
+    it("GIVEN a datetime with a Z designator WHEN validated THEN validation succeeds", () => {
+      const result = validateContentInstanceData(extendedSchema, {
+        publishMoment: "2026-07-01T12:30:00Z"
+      });
+
+      expect(result).toEqual({ valid: true, errors: [] });
+    });
+
+    it("GIVEN a whole-number decimal WHEN validated THEN it is accepted as a finite number", () => {
+      const result = validateContentInstanceData(extendedSchema, { rating: 5 });
+
+      expect(result).toEqual({ valid: true, errors: [] });
+    });
+
+    it("GIVEN invalid extended field values WHEN validated THEN type-specific errors are returned", () => {
+      const result = validateContentInstanceData(extendedSchema, {
+        featured: "true",
+        publishMoment: "2026-07-01T12:30:00",
+        rating: Number.POSITIVE_INFINITY,
+        body: 123,
+        canonicalUrl: "/relative/path"
+      });
+
+      expect(result.errors).toEqual([
+        {
+          field: "featured",
+          code: "INVALID_BOOLEAN",
+          message: "featured must be a boolean."
+        },
+        {
+          field: "publishMoment",
+          code: "INVALID_DATETIME",
+          message:
+            "publishMoment must be a timestamp with an explicit timezone offset or Z designator."
+        },
+        {
+          field: "rating",
+          code: "INVALID_DECIMAL",
+          message: "rating must be a finite number."
+        },
+        {
+          field: "body",
+          code: "INVALID_HTML",
+          message: "body must be a string."
+        },
+        {
+          field: "canonicalUrl",
+          code: "INVALID_URI",
+          message: "canonicalUrl must be an absolute URI."
+        }
+      ]);
+    });
+
+    it("GIVEN a datetime without timezone information WHEN validated THEN it is rejected", () => {
+      const result = validateContentInstanceData(extendedSchema, {
+        publishMoment: "2026-07-01 12:30:00"
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: "publishMoment",
+        code: "INVALID_DATETIME",
+        message:
+          "publishMoment must be a timestamp with an explicit timezone offset or Z designator."
+      });
+    });
+
+    it("GIVEN a decimal supplied as a string WHEN validated THEN it is rejected without coercion", () => {
+      const result = validateContentInstanceData(extendedSchema, { rating: "4.5" });
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: "rating",
+        code: "INVALID_DECIMAL",
+        message: "rating must be a finite number."
+      });
+    });
+  });
 });

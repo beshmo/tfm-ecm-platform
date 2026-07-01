@@ -64,12 +64,12 @@ The system SHALL validate content type schema definitions with allowlisted schem
 
 #### Scenario: Unsupported field type is rejected
 
-- **WHEN** a field type is not `string`, `integer`, `date`, or `time`
+- **WHEN** a field type is not `string`, `integer`, `date`, `time`, `boolean`, `datetime`, `decimal`, `html`, or `uri`
 - **THEN** validation fails with schema validation issues
 
 #### Scenario: Supported field types are accepted
 
-- **WHEN** field entries use only `string`, `integer`, `date`, and `time`
+- **WHEN** field entries use only `string`, `integer`, `date`, `time`, `boolean`, `datetime`, `decimal`, `html`, or `uri`
 - **THEN** validation succeeds for those field types
 
 ### Requirement: Protect schema input handling

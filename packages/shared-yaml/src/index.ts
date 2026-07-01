@@ -27,7 +27,12 @@ const SUPPORTED_FIELD_TYPES = new Set<ContentFieldType>([
   "string",
   "integer",
   "date",
-  "time"
+  "time",
+  "boolean",
+  "datetime",
+  "decimal",
+  "html",
+  "uri"
 ]);
 const BLOCKED_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 const NAME_PATTERN = /^[a-z][a-z0-9-]*$/;

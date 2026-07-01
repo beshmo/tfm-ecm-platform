@@ -1,4 +1,8 @@
-import { CMIS_REPOSITORY_ID, INITIAL_GENERIC_CONTENT_TYPE_SCHEMA } from "@ecmp/shared-types";
+import {
+  CMIS_REPOSITORY_ID,
+  INITIAL_GENERIC_CONTENT_TYPE_SCHEMA,
+  type ContentTypeSchemaDefinition
+} from "@ecmp/shared-types";
 import type { StaticFileStorage, StaticFileStorageSaveInput } from "../domain/static-file.storage";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
@@ -103,6 +107,41 @@ describe("content-service CMIS Browser Binding adapter", () => {
         expect(typeIds).not.toContain("cmis:relationship");
         expect(typeIds).not.toContain("cmis:policy");
         expect(typeIds).not.toContain("cmis:secondary");
+      });
+  });
+
+  it("GIVEN a schema with extended field types WHEN CMIS types are discovered THEN property types map to the closest CMIS type", async () => {
+    app = await createApp([
+      {
+        name: "article",
+        version: "1.0",
+        fields: [
+          { name: "featured", type: "boolean", required: true },
+          { name: "publishMoment", type: "datetime", required: false },
+          { name: "rating", type: "decimal", required: false },
+          { name: "body", type: "html", required: false },
+          { name: "canonicalUrl", type: "uri", required: false }
+        ]
+      }
+    ]);
+
+    await request(app.getHttpServer())
+      .get(`/api/cmis/${CMIS_REPOSITORY_ID}/types`)
+      .expect(200)
+      .expect((response) => {
+        const types = response.body.types as Array<{
+          id: string;
+          propertyDefinitions: Array<{ id: string; propertyType: string }>;
+        }>;
+        const article = types.find((type) => type.id === "ecmp:article");
+        const propertyType = (id: string): string | undefined =>
+          article?.propertyDefinitions.find((property) => property.id === id)?.propertyType;
+
+        expect(propertyType("ecmp:featured")).toBe("boolean");
+        expect(propertyType("ecmp:publishMoment")).toBe("datetime");
+        expect(propertyType("ecmp:rating")).toBe("decimal");
+        expect(propertyType("ecmp:body")).toBe("string");
+        expect(propertyType("ecmp:canonicalUrl")).toBe("string");
       });
   });
 
@@ -216,7 +255,9 @@ describe("content-service CMIS Browser Binding adapter", () => {
       });
   });
 
-  async function createApp(): Promise<INestApplication> {
+  async function createApp(
+    schemas: ContentTypeSchemaDefinition[] = [INITIAL_GENERIC_CONTENT_TYPE_SCHEMA]
+  ): Promise<INestApplication> {
     storage = new MemoryStaticFileStorage();
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule]
@@ -224,7 +265,7 @@ describe("content-service CMIS Browser Binding adapter", () => {
       .overrideProvider(STATIC_FILE_STORAGE)
       .useValue(storage)
       .overrideProvider(CONTENT_TYPE_SCHEMA_READER)
-      .useValue(new InMemoryContentTypeSchemaReader([INITIAL_GENERIC_CONTENT_TYPE_SCHEMA]))
+      .useValue(new InMemoryContentTypeSchemaReader(schemas))
       .compile();
     const nextApp = moduleRef.createNestApplication();
 

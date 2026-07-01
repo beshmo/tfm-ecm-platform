@@ -3,6 +3,7 @@ import {
   INITIAL_GENERIC_CONTENT_TYPE_SCHEMA,
   ROOT_FOLDER_ID,
   type ContentRecord,
+  type ContentTypeSchemaDefinition,
   type Folder,
   type StaticFile
 } from "@ecmp/shared-types";
@@ -171,6 +172,82 @@ describe("folder explorer page integration", () => {
     expect(input(fixture, "title").value).toBe("Still here");
   });
 
+  it("creates content with extended field types submitting backend-required JSON shapes", async () => {
+    contentTypeApi.listSchemas.mockResolvedValue([{ name: "article", version: "1.0", active: true }]);
+    contentTypeApi.getLatestSchema.mockResolvedValue(EXTENDED_SCHEMA);
+    const fixture = await renderExplorer();
+
+    await clickButton(fixture, "New content");
+    await fixture.componentInstance.openCreate();
+    await settle(fixture);
+
+    setCheckbox(fixture, "featured", true);
+    await setInputValue(fixture, "publishMoment", "2026-07-01T14:30:00+02:00");
+    await setInputValue(fixture, "rating", "4.5");
+    await setTextareaValue(fixture, "body", "<p>Hello</p>");
+    await setInputValue(fixture, "canonicalUrl", "https://example.com/article");
+    await submitForm(fixture);
+
+    expect(contentApi.createContent).toHaveBeenCalledWith({
+      folderId: ROOT_FOLDER_ID,
+      contentType: "article",
+      schemaVersion: "1.0",
+      data: {
+        featured: true,
+        publishMoment: "2026-07-01T14:30:00+02:00",
+        rating: 4.5,
+        body: "<p>Hello</p>",
+        canonicalUrl: "https://example.com/article"
+      }
+    });
+    // The HTML field is authored in a textarea; its source is never rendered as
+    // trusted markup, so no paragraph element is injected into the editor.
+    expect(fixture.nativeElement.querySelector(".editor p")).toBeNull();
+  });
+
+  it("edits extended content preserving datetime timezone text and boolean values", async () => {
+    contentTypeApi.getSchemaVersion.mockResolvedValue(EXTENDED_SCHEMA);
+    const record: ContentRecord = {
+      contentId: "RCD-1",
+      folderId: ROOT_FOLDER_ID,
+      contentType: "article",
+      schemaVersion: "1.0",
+      version: 1,
+      status: "draft",
+      data: {
+        featured: true,
+        publishMoment: "2026-07-01T14:30:00+02:00",
+        rating: 4.5,
+        body: "<p>Hi</p>",
+        canonicalUrl: "https://example.com"
+      },
+      createdAt: "2026-06-29T10:00:00.000Z",
+      updatedAt: "2026-06-29T10:00:00.000Z"
+    };
+    const fixture = await renderExplorer();
+
+    await fixture.componentInstance.openEdit(record);
+    await settle(fixture);
+
+    expect(input(fixture, "publishMoment").value).toBe("2026-07-01T14:30:00+02:00");
+    expect(input(fixture, "featured").checked).toBe(true);
+
+    await submitForm(fixture);
+
+    expect(contentApi.replaceContent).toHaveBeenCalledWith("RCD-1", {
+      folderId: ROOT_FOLDER_ID,
+      contentType: "article",
+      schemaVersion: "1.0",
+      data: {
+        featured: true,
+        publishMoment: "2026-07-01T14:30:00+02:00",
+        rating: 4.5,
+        body: "<p>Hi</p>",
+        canonicalUrl: "https://example.com"
+      }
+    });
+  });
+
   it("edits and deletes content through rendered controls", async () => {
     const fixture = await renderExplorer();
 
@@ -299,6 +376,41 @@ async function setInputValue(
   await settle(fixture);
 }
 
+function setCheckbox(
+  fixture: ComponentFixture<FolderExplorerPageComponent>,
+  name: string,
+  checked: boolean
+): void {
+  const control = input(fixture, name);
+
+  control.checked = checked;
+  control.dispatchEvent(new Event("change"));
+  fixture.detectChanges();
+}
+
+async function setTextareaValue(
+  fixture: ComponentFixture<FolderExplorerPageComponent>,
+  name: string,
+  value: string
+): Promise<void> {
+  const control =
+    (Array.from(fixture.nativeElement.querySelectorAll("textarea")) as HTMLTextAreaElement[]).find(
+      (item) => item.name === name
+    ) ??
+    (Array.from(fixture.nativeElement.querySelectorAll("label")) as HTMLLabelElement[])
+      .find((label) => label.textContent?.trim().startsWith(name))
+      ?.querySelector("textarea") ??
+    null;
+
+  if (!control) {
+    throw new Error(`Missing textarea "${name}".`);
+  }
+
+  control.value = value;
+  control.dispatchEvent(new Event("input"));
+  await settle(fixture);
+}
+
 async function submitForm(fixture: ComponentFixture<FolderExplorerPageComponent>): Promise<void> {
   const form = fixture.nativeElement.querySelector("form") as HTMLFormElement | null;
 
@@ -347,6 +459,18 @@ function buttons(fixture: ComponentFixture<FolderExplorerPageComponent>): HTMLBu
 function pageText(fixture: ComponentFixture<FolderExplorerPageComponent>): string {
   return fixture.nativeElement.textContent ?? "";
 }
+
+const EXTENDED_SCHEMA: ContentTypeSchemaDefinition = {
+  name: "article",
+  version: "1.0",
+  fields: [
+    { name: "featured", type: "boolean", required: false },
+    { name: "publishMoment", type: "datetime", required: false },
+    { name: "rating", type: "decimal", required: false },
+    { name: "body", type: "html", required: false },
+    { name: "canonicalUrl", type: "uri", required: false }
+  ]
+};
 
 function folder(folderId: Folder["folderId"], name: string, path: string): Folder {
   return {

@@ -144,6 +144,41 @@ describe("shared types", () => {
     expect(supportedFieldTypes).toEqual(["string", "integer", "date", "time"]);
   });
 
+  it("GIVEN a normalized content type schema WHEN extended fields are defined THEN extended field types are supported", () => {
+    const supportedFieldTypes: ContentFieldType[] = [
+      "string",
+      "integer",
+      "date",
+      "time",
+      "boolean",
+      "datetime",
+      "decimal",
+      "html",
+      "uri"
+    ];
+    const schema: ContentTypeSchemaDefinition = {
+      name: "article",
+      version: "1.0",
+      fields: [
+        { name: "featured", type: "boolean", required: false },
+        { name: "publishMoment", type: "datetime", required: false },
+        { name: "rating", type: "decimal", required: false },
+        { name: "body", type: "html", required: false },
+        { name: "canonicalUrl", type: "uri", required: false }
+      ]
+    };
+
+    expect(schema.fields.map((field) => field.type)).toEqual([
+      "boolean",
+      "datetime",
+      "decimal",
+      "html",
+      "uri"
+    ]);
+    expect(supportedFieldTypes).toContain("boolean");
+    expect(supportedFieldTypes).toContain("uri");
+  });
+
   it("GIVEN a content type schema summary WHEN it is shared THEN it exposes lifecycle state", () => {
     const summary: ContentTypeSchemaSummary = {
       name: "generic",
@@ -180,7 +215,12 @@ describe("shared types", () => {
       "INVALID_STRING",
       "INVALID_INTEGER",
       "INVALID_DATE",
-      "INVALID_TIME"
+      "INVALID_TIME",
+      "INVALID_BOOLEAN",
+      "INVALID_DATETIME",
+      "INVALID_DECIMAL",
+      "INVALID_HTML",
+      "INVALID_URI"
     ];
     const data: ContentInstanceData = { publishDate: "tomorrow" };
     const input: ContentInstanceValidationInput = {
@@ -396,6 +436,58 @@ describe("shared types", () => {
         expect.objectContaining({ id: "ecmp:priority", required: false, propertyType: "integer" })
       ])
     );
+  });
+
+  it("GIVEN extended schema field types WHEN mapped to CMIS THEN property definitions use the closest supported CMIS type", () => {
+    const extendedType = cmisTypeDefinitionFromSchema({
+      name: "article",
+      version: "1.0",
+      fields: [
+        { name: "featured", type: "boolean", required: true },
+        { name: "publishMoment", type: "datetime", required: false },
+        { name: "rating", type: "decimal", required: false },
+        { name: "body", type: "html", required: false },
+        { name: "canonicalUrl", type: "uri", required: false }
+      ]
+    });
+
+    expect(extendedType.propertyDefinitions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "ecmp:featured", propertyType: "boolean" }),
+        expect.objectContaining({ id: "ecmp:publishMoment", propertyType: "datetime" }),
+        expect.objectContaining({ id: "ecmp:rating", propertyType: "decimal" }),
+        expect.objectContaining({ id: "ecmp:body", propertyType: "string" }),
+        expect.objectContaining({ id: "ecmp:canonicalUrl", propertyType: "string" })
+      ])
+    );
+  });
+
+  it("GIVEN a content record with extended field values WHEN mapped to CMIS THEN scalar values are exposed as property values", () => {
+    const content = cmisObjectFromContentRecord({
+      contentId: "RCD-9",
+      folderId: ROOT_FOLDER_ID,
+      contentType: "article",
+      schemaVersion: "1.0",
+      version: 1,
+      status: "draft",
+      data: {
+        featured: true,
+        publishMoment: "2026-07-01T12:30:00Z",
+        rating: 4.5,
+        body: "<p>Hello</p>",
+        canonicalUrl: "https://example.com/a"
+      },
+      createdAt: "2026-06-29T10:00:00.000Z",
+      updatedAt: "2026-06-29T10:00:00.000Z"
+    });
+
+    expect(content.properties).toMatchObject({
+      "ecmp:featured": true,
+      "ecmp:publishMoment": "2026-07-01T12:30:00Z",
+      "ecmp:rating": 4.5,
+      "ecmp:body": "<p>Hello</p>",
+      "ecmp:canonicalUrl": "https://example.com/a"
+    });
   });
 
   it("GIVEN CMIS base type discovery WHEN listed THEN it includes cmis:item and excludes unsupported optional base types", () => {

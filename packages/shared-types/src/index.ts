@@ -53,7 +53,16 @@ export interface HealthResponse {
 
 export type ContentTypeName = string;
 export type ContentTypeVersion = string;
-export type ContentFieldType = "string" | "integer" | "date" | "time";
+export type ContentFieldType =
+  | "string"
+  | "integer"
+  | "date"
+  | "time"
+  | "boolean"
+  | "datetime"
+  | "decimal"
+  | "html"
+  | "uri";
 
 export interface ContentTypeFieldDefinition {
   type: ContentFieldType;
@@ -131,7 +140,12 @@ export type ContentValidationErrorCode =
   | "INVALID_STRING"
   | "INVALID_INTEGER"
   | "INVALID_DATE"
-  | "INVALID_TIME";
+  | "INVALID_TIME"
+  | "INVALID_BOOLEAN"
+  | "INVALID_DATETIME"
+  | "INVALID_DECIMAL"
+  | "INVALID_HTML"
+  | "INVALID_URI";
 
 export interface ContentValidationError {
   field: string;
@@ -331,7 +345,13 @@ export interface CmisServiceDocument {
 
 export type CmisBaseTypeId = "cmis:folder" | "cmis:document" | "cmis:item";
 export type CmisObjectTypeId = CmisBaseTypeId | `ecmp:${string}`;
-export type CmisPropertyType = "id" | "string" | "integer" | "datetime" | "boolean";
+export type CmisPropertyType =
+  | "id"
+  | "string"
+  | "integer"
+  | "decimal"
+  | "datetime"
+  | "boolean";
 
 export interface CmisPropertyDefinition {
   id: string;
@@ -840,11 +860,20 @@ function propertyDefinition(
 }
 
 function cmisPropertyTypeForContentField(fieldType: ContentFieldType): CmisPropertyType {
-  if (fieldType === "integer") {
-    return "integer";
+  switch (fieldType) {
+    case "integer":
+      return "integer";
+    case "decimal":
+      return "decimal";
+    case "boolean":
+      return "boolean";
+    case "datetime":
+      return "datetime";
+    // `string`, `date`, `time`, `html`, and `uri` have no dedicated CMIS
+    // primitive in the shared contract and are projected as CMIS `string`.
+    default:
+      return "string";
   }
-
-  return "string";
 }
 
 function isCmisPropertyValue(value: unknown): value is CmisPropertyValue {

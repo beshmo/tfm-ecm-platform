@@ -954,7 +954,9 @@ User-defined content types extend the platform by adding schemas for business co
 
 ### Supported Field Types
 
-The first implementation will support a small set of simple field types.
+Content schemas support a fixed, allowlisted set of field types. Content instance
+values are validated against these types without implicit coercion, so each value
+must already be the correct JSON type.
 
 | Type | Description | Example |
 | --- | --- | --- |
@@ -962,6 +964,11 @@ The first implementation will support a small set of simple field types.
 | `integer` | Whole numeric value without decimal places. | `10` |
 | `date` | Calendar date without time information, using ISO `YYYY-MM-DD` format. | `"2026-06-01"` |
 | `time` | Time value without date information, using `HH:mm:ss` format. | `"14:30:00"` |
+| `boolean` | JSON boolean value. | `true` |
+| `datetime` | Timezone-aware RFC 3339 timestamp requiring an explicit `Z` or numeric offset. | `"2026-07-01T14:30:00+02:00"` |
+| `decimal` | Finite JSON number, including fractional values. | `4.5` |
+| `html` | HTML-formatted text stored as a string source (see security note below). | `"<p>Hello</p>"` |
+| `uri` | Syntactically valid absolute URI string. | `"https://example.com/a"` |
 
 Additional field types may be added later when required by the platform.
 
@@ -984,6 +991,19 @@ Type-specific validation:
 | `integer` | Must be a whole number. Decimal values are invalid. |
 | `date` | Must be a valid ISO date using `YYYY-MM-DD` format. |
 | `time` | Must be a valid time using `HH:mm:ss` format. |
+| `boolean` | Must be a JSON boolean. Strings such as `"true"` are not coerced and are invalid. |
+| `datetime` | Must be a timestamp with an explicit timezone: either a trailing `Z` or a numeric `±HH:mm` offset. Timestamps without timezone information are invalid. |
+| `decimal` | Must be a finite JSON number. Non-finite values and numeric strings are invalid. |
+| `html` | Must be a string. The backend stores the HTML source and does not parse or execute markup. |
+| `uri` | Must be a syntactically valid absolute URI (parseable by the platform URL parser). Relative or scheme-less references are invalid. |
+
+> **HTML rendering security constraint.** An `html` field value is stored and
+> transported as untrusted text source, not as trusted DOM markup. The backend
+> never parses or executes it, and authoring surfaces edit it as plain text in a
+> textarea. Any surface that later renders an `html` value as markup MUST pass it
+> through a controlled sanitization step before inserting it into the DOM;
+> rendering stored HTML directly (for example via `innerHTML` or Angular's
+> `bypassSecurityTrust*` APIs) would introduce a stored XSS vulnerability.
 
 Example validation error shape:
 
