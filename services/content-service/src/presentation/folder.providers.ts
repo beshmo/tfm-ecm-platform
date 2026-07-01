@@ -1,8 +1,4 @@
 import {
-  INITIAL_GENERIC_CONTENT_TYPE_SCHEMA,
-  type ContentTypeSchemaDefinition
-} from "@ecmp/shared-types";
-import {
   CreateContentUseCase,
   DeleteContentUseCase,
   GetContentUseCase,
@@ -35,7 +31,7 @@ import type { StaticFileRepository } from "../domain/static-file.repository";
 import type { StaticFileStorage } from "../domain/static-file.storage";
 import { CompositeFolderContentReader } from "../infrastructure/composite-folder-content.reader";
 import { FilesystemStaticFileStorage } from "../infrastructure/filesystem-static-file.storage";
-import { InMemoryContentTypeSchemaReader } from "../infrastructure/in-memory-content-type-schema.reader";
+import { HttpContentTypeSchemaReader } from "../infrastructure/http-content-type-schema.reader";
 import {
   CryptoContentIdGenerator,
   InMemoryContentRepository
@@ -90,8 +86,7 @@ export const folderProviders = [
   },
   {
     provide: CONTENT_TYPE_SCHEMA_READER,
-    useFactory: (): ContentTypeSchemaReader =>
-      new InMemoryContentTypeSchemaReader([cloneSchema(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA)])
+    useFactory: (): ContentTypeSchemaReader => new HttpContentTypeSchemaReader()
   },
   {
     provide: FOLDER_CONTENT_READER,
@@ -227,12 +222,3 @@ export const folderProviders = [
     inject: [STATIC_FILE_REPOSITORY, STATIC_FILE_STORAGE]
   }
 ];
-
-function cloneSchema(schema: ContentTypeSchemaDefinition): ContentTypeSchemaDefinition {
-  return {
-    ...schema,
-    fields: Object.fromEntries(
-      Object.entries(schema.fields).map(([fieldName, field]) => [fieldName, { ...field }])
-    )
-  };
-}

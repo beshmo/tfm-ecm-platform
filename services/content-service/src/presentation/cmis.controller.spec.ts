@@ -1,12 +1,13 @@
-import { CMIS_REPOSITORY_ID } from "@ecmp/shared-types";
+import { CMIS_REPOSITORY_ID, INITIAL_GENERIC_CONTENT_TYPE_SCHEMA } from "@ecmp/shared-types";
 import type { StaticFileStorage, StaticFileStorageSaveInput } from "../domain/static-file.storage";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { InMemoryContentTypeSchemaReader } from "../infrastructure/in-memory-content-type-schema.reader";
 import { AppModule } from "./app.module";
-import { STATIC_FILE_STORAGE } from "./folder.providers";
+import { CONTENT_TYPE_SCHEMA_READER, STATIC_FILE_STORAGE } from "./folder.providers";
 
 describe("content-service CMIS Browser Binding adapter", () => {
   let app: INestApplication | null = null;
@@ -222,6 +223,8 @@ describe("content-service CMIS Browser Binding adapter", () => {
     })
       .overrideProvider(STATIC_FILE_STORAGE)
       .useValue(storage)
+      .overrideProvider(CONTENT_TYPE_SCHEMA_READER)
+      .useValue(new InMemoryContentTypeSchemaReader([INITIAL_GENERIC_CONTENT_TYPE_SCHEMA]))
       .compile();
     const nextApp = moduleRef.createNestApplication();
 

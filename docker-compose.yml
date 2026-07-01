@@ -60,12 +60,14 @@ services:
       PORT: 3002
       MONGODB_URI: mongodb://ecmp:ecmp-local@mongodb:27017/ecmp_management?authSource=admin
       FILE_STORAGE_PATH: ${MANAGEMENT_FILE_STORAGE_PATH:-/var/lib/ecmp/management-files}
+      CONTENT_TYPE_SERVICE_URL: http://content-type-service:3003
     ports:
       - "${CONTENT_SERVICE_PORT:-3002}:3002"
     volumes:
       - management-file-storage:${MANAGEMENT_FILE_STORAGE_PATH:-/var/lib/ecmp/management-files}
     depends_on:
       - mongodb
+      - content-type-service
 
   content-type-service:
     build:

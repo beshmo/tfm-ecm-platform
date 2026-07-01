@@ -1,4 +1,7 @@
-import type { ContentTypeSchemaDefinition } from "@ecmp/shared-types";
+import {
+  INITIAL_GENERIC_CONTENT_TYPE_SCHEMA,
+  type ContentTypeSchemaDefinition
+} from "@ecmp/shared-types";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
@@ -84,7 +87,10 @@ describe("content-service content management endpoints", () => {
   it("GIVEN the default generic schema WHEN posted without schema version THEN content is created with schema version 1.0", async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule]
-    }).compile();
+    })
+      .overrideProvider(CONTENT_TYPE_SCHEMA_READER)
+      .useValue(new InMemoryContentTypeSchemaReader([INITIAL_GENERIC_CONTENT_TYPE_SCHEMA]))
+      .compile();
     app = moduleRef.createNestApplication();
     await app.init();
 
