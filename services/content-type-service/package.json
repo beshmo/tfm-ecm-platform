@@ -6,6 +6,7 @@
   "main": "dist/main.js",
   "scripts": {
     "start": "node dist/main.js",
+    "prestart:dev": "pnpm --filter @ecmp/shared-types --filter @ecmp/shared-yaml build",
     "start:dev": "tsx src/main.ts",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

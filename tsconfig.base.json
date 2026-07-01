@@ -16,12 +16,6 @@
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "sourceMap": true,
-    "baseUrl": ".",
-    "paths": {
-      "@ecmp/shared-types": ["packages/shared-types/dist/index.d.ts"],
-      "@ecmp/shared-events": ["packages/shared-events/dist/index.d.ts"],
-      "@ecmp/shared-auth": ["packages/shared-auth/dist/index.d.ts"],
-      "@ecmp/shared-yaml": ["packages/shared-yaml/dist/index.d.ts"]
-    }
+    "baseUrl": "."
   }
 }
