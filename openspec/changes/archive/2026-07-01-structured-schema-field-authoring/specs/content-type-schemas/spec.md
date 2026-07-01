@@ -1,8 +1,4 @@
-## Purpose
-
-Content type schemas define author-facing YAML schema definitions for user-defined content types. This capability covers parsing, normalization, validation, version lifecycle, and backend domain/application use cases for schema management.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Parse author-facing YAML schemas
 
@@ -96,20 +92,6 @@ The system SHALL reject unsafe or ambiguous schema input before storing a conten
 - **WHEN** schema text uses unsupported YAML aliases, anchors, or ambiguous shapes
 - **THEN** the parser rejects the schema instead of silently coercing it
 
-### Requirement: Reserve internal platform type names
-
-The system SHALL prevent user-defined content type schemas from using names reserved for internal platform types.
-
-#### Scenario: Folder type name is rejected
-
-- **WHEN** a schema name attempts to define `folder` or `folders`
-- **THEN** validation fails because folder is an internal platform type
-
-#### Scenario: Document compatibility type name is rejected
-
-- **WHEN** a schema name attempts to define `static-file`, `static-files`, `file`, or `files`
-- **THEN** validation fails because document is an internal platform type and those names are reserved compatibility aliases
-
 ### Requirement: Create schema versions
 
 The system SHALL create content type schema versions from valid ordered YAML schema text through an application use case.
@@ -143,39 +125,6 @@ The system SHALL replace an existing active schema version when the requested na
 - **WHEN** the requested schema version is inactive
 - **THEN** the replace use case rejects the replacement
 
-### Requirement: Retrieve and list schema versions
-
-The system SHALL retrieve content type schemas by latest active version, by explicit version, and as active schema summaries.
-
-#### Scenario: Latest lookup returns active version
-
-- **WHEN** a content type has active and inactive schema versions
-- **THEN** latest lookup returns the highest active version only
-
-#### Scenario: Explicit lookup includes inactive version
-
-- **WHEN** a specific inactive schema version is requested by `name + version`
-- **THEN** the get version use case returns that schema definition
-
-#### Scenario: List returns active summaries
-
-- **WHEN** schemas are listed
-- **THEN** the list use case returns summaries for active schema versions only
-
-### Requirement: Soft deactivate schema versions
-
-The system SHALL soft deactivate schema versions instead of physically deleting them.
-
-#### Scenario: Schema version is deactivated
-
-- **WHEN** an existing schema version is deactivated
-- **THEN** it is marked inactive and remains retrievable by explicit version
-
-#### Scenario: Deactivated version is excluded from active lookups
-
-- **WHEN** a schema version has been deactivated
-- **THEN** latest lookup and active listing exclude that version
-
 ### Requirement: Content type schema read REST API is exposed
 The system SHALL expose read-only Content Type Service management endpoints for listing active schemas and retrieving ordered schema definitions.
 
@@ -194,36 +143,6 @@ The system SHALL expose read-only Content Type Service management endpoints for 
 #### Scenario: Map missing schema read
 - **WHEN** a content type schema read request targets a missing schema
 - **THEN** the system responds with status `404`
-
-### Requirement: Content type schema reads are routed through the gateway
-The system SHALL route API Gateway requests under `/api/management/content-types` to the Content Type Service.
-
-#### Scenario: Gateway forwards schema list
-- **WHEN** the API Gateway receives `GET /api/management/content-types`
-- **THEN** it forwards the request to the Content Type Service and returns the service status and response body
-
-#### Scenario: Gateway forwards schema detail
-- **WHEN** the API Gateway receives `GET /api/management/content-types/{name}` or `GET /api/management/content-types/{name}/versions/{version}`
-- **THEN** it forwards the request to the Content Type Service and returns the service status and response body
-
-### Requirement: Content type schema write REST API is exposed
-The system SHALL expose Content Type Service management endpoints for creating, replacing, and soft deactivating content type schema versions.
-
-#### Scenario: Create schema version endpoint
-- **WHEN** a valid `POST /api/management/content-types` request sends YAML schema source for a new `name + version`
-- **THEN** the system responds with status `201`, stores the schema version, and returns the normalized schema definition
-
-#### Scenario: Replace schema version endpoint
-- **WHEN** a valid `PUT /api/management/content-types/{name}/versions/{version}` request sends YAML schema source matching the requested schema identity
-- **THEN** the system responds with status `200`, replaces the active schema version, and returns the normalized schema definition
-
-#### Scenario: Deactivate schema version endpoint
-- **WHEN** a valid `DELETE /api/management/content-types/{name}/versions/{version}` request targets an existing schema version
-- **THEN** the system soft deactivates the schema version and responds with status `204`
-
-#### Scenario: Deactivated version remains explicitly retrievable
-- **WHEN** a deactivated schema version is requested through `GET /api/management/content-types/{name}/versions/{version}`
-- **THEN** the system responds with status `200` and the normalized schema definition for that inactive version
 
 ### Requirement: Schema write requests use YAML source DTOs
 The system SHALL accept schema create and replace requests as JSON DTOs containing author-facing ordered YAML schema source text.
@@ -255,44 +174,3 @@ The system SHALL accept schema create and replace requests as JSON DTOs containi
 #### Scenario: Missing schema write target is rejected
 - **WHEN** a schema replace or deactivate request targets a missing schema version
 - **THEN** the system responds with status `404`
-
-### Requirement: Content type schema writes are routed through the gateway
-The system SHALL route API Gateway write requests under `/api/management/content-types` to the Content Type Service.
-
-#### Scenario: Gateway forwards schema create
-- **WHEN** the API Gateway receives `POST /api/management/content-types` with a JSON schema source DTO
-- **THEN** it forwards the request to the Content Type Service and returns the downstream status and response body
-
-#### Scenario: Gateway forwards schema replace
-- **WHEN** the API Gateway receives `PUT /api/management/content-types/{name}/versions/{version}` with a JSON schema source DTO
-- **THEN** it forwards the method, path, and request body to the Content Type Service
-
-#### Scenario: Gateway forwards schema deactivate
-- **WHEN** the API Gateway receives `DELETE /api/management/content-types/{name}/versions/{version}`
-- **THEN** it forwards the method and path to the Content Type Service and returns the downstream status
-
-### Requirement: YAML schema payload size is configurable
-The system SHALL enforce a configurable maximum size for author-facing YAML schema source text used in production management requests.
-
-#### Scenario: Default YAML source size limit is applied
-- **WHEN** no explicit YAML schema size configuration is provided
-- **THEN** the system uses a safe default maximum of `65536` bytes for schema source text
-
-#### Scenario: Configured YAML source size limit is applied
-- **WHEN** the runtime config sets a maximum YAML schema source size
-- **THEN** schema create and replace requests use that configured limit before YAML parsing
-
-#### Scenario: Oversized schema request is rejected
-- **WHEN** a schema create or replace request sends `schemaSource` larger than the configured maximum
-- **THEN** the system responds with status `413` without parsing or storing the schema
-
-#### Scenario: Parser retains size defense
-- **WHEN** schema source larger than the configured parser limit is parsed outside the HTTP request path
-- **THEN** the parser rejects the input with a sanitized schema validation error before parsing YAML
-
-### Requirement: Durable schema persistence remains deferred
-The system SHALL keep MongoDB-backed content type schema persistence deferred while exposing schema management through the existing in-memory repository for this phase.
-
-#### Scenario: MongoDB persistence is not introduced
-- **WHEN** this change is implemented
-- **THEN** no MongoDB repository, collection migration, or database integration is introduced for content type schemas

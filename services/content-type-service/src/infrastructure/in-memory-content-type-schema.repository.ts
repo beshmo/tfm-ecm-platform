@@ -84,12 +84,7 @@ function cloneRecord(record: ContentTypeSchemaRecord): ContentTypeSchemaRecord {
     ...record,
     definition: {
       ...record.definition,
-      fields: Object.fromEntries(
-        Object.entries(record.definition.fields).map(([fieldName, field]) => [
-          fieldName,
-          { ...field }
-        ])
-      )
+      fields: record.definition.fields.map((field) => ({ ...field }))
     },
     createdAt: new Date(record.createdAt),
     updatedAt: new Date(record.updatedAt),

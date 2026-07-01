@@ -56,12 +56,7 @@ function schemaKey(name: ContentTypeName, version: ContentTypeVersion): string {
 function cloneSchema(schema: ContentTypeSchemaDefinition): ContentTypeSchemaDefinition {
   return {
     ...schema,
-    fields: Object.fromEntries(
-      Object.entries(schema.fields).map(([fieldName, definition]) => [
-        fieldName,
-        { ...definition }
-      ])
-    )
+    fields: schema.fields.map((field) => ({ ...field }))
   };
 }
 

@@ -2,7 +2,7 @@ import { CommonModule } from "@angular/common";
 import { Component, Inject, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import type {
-  ContentTypeFieldDefinition,
+  ContentFieldType,
   ContentTypeName,
   ContentTypeSchemaDefinition,
   ContentTypeSchemaSummary,
@@ -12,10 +12,19 @@ import type {
 import type { ApiClientError } from "../../../shared/infrastructure/api-client-error";
 import { ContentTypeApiClient } from "../infrastructure/content-type-api.client";
 
-interface SchemaFieldView {
+interface SchemaFieldDraft {
   name: string;
-  definition: ContentTypeFieldDefinition;
+  type: ContentFieldType;
+  required: boolean;
 }
+
+interface SchemaDraft {
+  name: string;
+  version: string;
+  fields: SchemaFieldDraft[];
+}
+
+const FIELD_TYPES: readonly ContentFieldType[] = ["string", "integer", "date", "time"];
 
 @Component({
   selector: "ecmp-content-type-schemas-page",
@@ -79,7 +88,7 @@ interface SchemaFieldView {
               <strong>{{ selectedSummary?.active ? "Yes" : "No" }}</strong>
             </div>
 
-            <table *ngIf="schemaFields.length > 0">
+            <table *ngIf="selectedSchema && selectedSchema.fields.length > 0">
               <thead>
                 <tr>
                   <th>Field</th>
@@ -88,24 +97,87 @@ interface SchemaFieldView {
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let field of schemaFields">
+                <tr *ngFor="let field of selectedSchema.fields; trackBy: trackFieldByIndex">
                   <td>{{ field.name }}</td>
-                  <td>{{ field.definition.type }}</td>
-                  <td>{{ field.definition.required ? "Yes" : "No" }}</td>
+                  <td>{{ field.type }}</td>
+                  <td>{{ field.required ? "Yes" : "No" }}</td>
                 </tr>
               </tbody>
             </table>
           </section>
 
-          <section class="forms-grid" aria-label="Schema YAML forms">
-            <form (ngSubmit)="createFromYaml()" aria-label="Create schema">
+          <section class="forms-grid" aria-label="Schema forms">
+            <form (ngSubmit)="createSchema()" aria-label="Create schema">
               <h2>Create</h2>
-              <textarea
-                name="createSchemaSource"
-                [(ngModel)]="createSource"
-                rows="14"
-                spellcheck="false"
-              ></textarea>
+              <label>
+                Name
+                <input name="createSchemaName" [(ngModel)]="createDraft.name" />
+              </label>
+              <label>
+                Version
+                <input name="createSchemaVersion" [(ngModel)]="createDraft.version" />
+              </label>
+
+              <div class="fields-editor" aria-label="Create schema fields">
+                <div
+                  class="field-row"
+                  *ngFor="let field of createDraft.fields; let i = index; trackBy: trackFieldByIndex"
+                >
+                  <input
+                    [name]="'createFieldName-' + i"
+                    [attr.data-name]="'createFieldName-' + i"
+                    [(ngModel)]="field.name"
+                    placeholder="Field name"
+                    aria-label="Field name"
+                  />
+                  <select
+                    [name]="'createFieldType-' + i"
+                    [attr.data-name]="'createFieldType-' + i"
+                    [(ngModel)]="field.type"
+                    aria-label="Field type"
+                  >
+                    <option *ngFor="let type of fieldTypes" [value]="type">{{ type }}</option>
+                  </select>
+                  <label class="required-toggle">
+                    <input
+                      type="checkbox"
+                      [name]="'createFieldRequired-' + i"
+                      [attr.data-name]="'createFieldRequired-' + i"
+                      [(ngModel)]="field.required"
+                    />
+                    Required
+                  </label>
+                  <button
+                    type="button"
+                    class="secondary"
+                    (click)="moveCreateField(i, -1)"
+                    [disabled]="i === 0"
+                    aria-label="Move field up"
+                  >
+                    Up
+                  </button>
+                  <button
+                    type="button"
+                    class="secondary"
+                    (click)="moveCreateField(i, 1)"
+                    [disabled]="i === createDraft.fields.length - 1"
+                    aria-label="Move field down"
+                  >
+                    Down
+                  </button>
+                  <button
+                    type="button"
+                    class="secondary"
+                    (click)="removeCreateField(i)"
+                    aria-label="Remove field"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+
+              <button type="button" class="secondary" (click)="addCreateField()">Add field</button>
+
               <p *ngIf="createErrorMessage" class="error">{{ createErrorMessage }}</p>
               <ul *ngIf="createValidationMessages.length > 0" class="error-list">
                 <li *ngFor="let message of createValidationMessages">{{ message }}</li>
@@ -113,22 +185,88 @@ interface SchemaFieldView {
               <button type="submit" [disabled]="saving">Create schema</button>
             </form>
 
-            <form (ngSubmit)="replaceFromYaml()" aria-label="Replace schema">
+            <form (ngSubmit)="replaceSchema()" aria-label="Replace schema">
               <h2>Replace Selected</h2>
-              <textarea
-                name="replaceSchemaSource"
-                [(ngModel)]="replaceSource"
-                rows="14"
-                spellcheck="false"
-                [disabled]="!selectedSchema"
-              ></textarea>
+              <p *ngIf="!replaceDraft" class="empty">Select a schema to replace.</p>
+
+              <ng-container *ngIf="replaceDraft as draft">
+                <label>
+                  Name
+                  <input name="replaceSchemaName" [ngModel]="draft.name" disabled />
+                </label>
+                <label>
+                  Version
+                  <input name="replaceSchemaVersion" [ngModel]="draft.version" disabled />
+                </label>
+
+                <div class="fields-editor" aria-label="Replace schema fields">
+                  <div
+                    class="field-row"
+                    *ngFor="let field of draft.fields; let i = index; trackBy: trackFieldByIndex"
+                  >
+                    <input
+                      [name]="'replaceFieldName-' + i"
+                      [attr.data-name]="'replaceFieldName-' + i"
+                      [(ngModel)]="field.name"
+                      placeholder="Field name"
+                      aria-label="Field name"
+                    />
+                    <select
+                      [name]="'replaceFieldType-' + i"
+                      [attr.data-name]="'replaceFieldType-' + i"
+                      [(ngModel)]="field.type"
+                      aria-label="Field type"
+                    >
+                      <option *ngFor="let type of fieldTypes" [value]="type">{{ type }}</option>
+                    </select>
+                    <label class="required-toggle">
+                      <input
+                        type="checkbox"
+                        [name]="'replaceFieldRequired-' + i"
+                        [attr.data-name]="'replaceFieldRequired-' + i"
+                        [(ngModel)]="field.required"
+                      />
+                      Required
+                    </label>
+                    <button
+                      type="button"
+                      class="secondary"
+                      (click)="moveReplaceField(i, -1)"
+                      [disabled]="i === 0"
+                      aria-label="Move field up"
+                    >
+                      Up
+                    </button>
+                    <button
+                      type="button"
+                      class="secondary"
+                      (click)="moveReplaceField(i, 1)"
+                      [disabled]="i === draft.fields.length - 1"
+                      aria-label="Move field down"
+                    >
+                      Down
+                    </button>
+                    <button
+                      type="button"
+                      class="secondary"
+                      (click)="removeReplaceField(i)"
+                      aria-label="Remove field"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+
+                <button type="button" class="secondary" (click)="addReplaceField()">
+                  Add field
+                </button>
+              </ng-container>
+
               <p *ngIf="replaceErrorMessage" class="error">{{ replaceErrorMessage }}</p>
               <ul *ngIf="replaceValidationMessages.length > 0" class="error-list">
                 <li *ngFor="let message of replaceValidationMessages">{{ message }}</li>
               </ul>
-              <button type="submit" [disabled]="saving || !selectedSchema">
-                Replace schema
-              </button>
+              <button type="submit" [disabled]="saving || !replaceDraft">Replace schema</button>
             </form>
           </section>
         </article>
@@ -266,16 +404,40 @@ interface SchemaFieldView {
         min-width: 0;
       }
 
-      textarea {
+      form label {
+        display: grid;
+        gap: 0.25rem;
+      }
+
+      input,
+      select {
         border: 1px solid #b8c2cc;
-        box-sizing: border-box;
-        font-family: Consolas, "Liberation Mono", monospace;
-        line-height: 1.4;
-        max-width: 100%;
-        min-height: 18rem;
-        padding: 0.75rem;
-        resize: vertical;
-        width: 100%;
+        padding: 0.5rem;
+      }
+
+      .fields-editor {
+        display: grid;
+        gap: 0.5rem;
+      }
+
+      .field-row {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .field-row input[type="text"],
+      .field-row > input {
+        flex: 1 1 8rem;
+        min-width: 0;
+      }
+
+      .required-toggle {
+        align-items: center;
+        display: flex;
+        gap: 0.25rem;
+        white-space: nowrap;
       }
 
       .empty {
@@ -309,8 +471,9 @@ export class ContentTypeSchemasPageComponent implements OnInit {
   schemas: ContentTypeSchemaSummary[] = [];
   selectedSummary: ContentTypeSchemaSummary | null = null;
   selectedSchema: ContentTypeSchemaDefinition | null = null;
-  createSource = defaultSchemaSource();
-  replaceSource = "";
+  readonly fieldTypes = FIELD_TYPES;
+  createDraft: SchemaDraft = defaultCreateDraft();
+  replaceDraft: SchemaDraft | null = null;
   loading = false;
   detailLoading = false;
   saving = false;
@@ -325,13 +488,6 @@ export class ContentTypeSchemasPageComponent implements OnInit {
     @Inject(ContentTypeApiClient)
     private readonly contentTypeApi: ContentTypeApiClient
   ) {}
-
-  get schemaFields(): SchemaFieldView[] {
-    return Object.entries(this.selectedSchema?.fields ?? {}).map(([name, definition]) => ({
-      name,
-      definition
-    }));
-  }
 
   ngOnInit(): void {
     void this.loadSchemas();
@@ -354,7 +510,7 @@ export class ContentTypeSchemasPageComponent implements OnInit {
       } else {
         this.selectedSummary = null;
         this.selectedSchema = null;
-        this.replaceSource = "";
+        this.replaceDraft = null;
       }
     } catch (error) {
       this.applyPageError(error);
@@ -374,22 +530,48 @@ export class ContentTypeSchemasPageComponent implements OnInit {
         summary.name,
         summary.version
       );
-      this.replaceSource = schemaToYaml(this.selectedSchema);
+      this.replaceDraft = draftFromSchema(this.selectedSchema);
     } catch (error) {
       this.selectedSchema = null;
-      this.replaceSource = "";
+      this.replaceDraft = null;
       this.applyDetailError(error);
     } finally {
       this.detailLoading = false;
     }
   }
 
-  async createFromYaml(): Promise<void> {
+  addCreateField(): void {
+    this.createDraft.fields.push(emptyFieldDraft());
+  }
+
+  removeCreateField(index: number): void {
+    this.createDraft.fields.splice(index, 1);
+  }
+
+  moveCreateField(index: number, direction: -1 | 1): void {
+    moveField(this.createDraft.fields, index, direction);
+  }
+
+  addReplaceField(): void {
+    this.replaceDraft?.fields.push(emptyFieldDraft());
+  }
+
+  removeReplaceField(index: number): void {
+    this.replaceDraft?.fields.splice(index, 1);
+  }
+
+  moveReplaceField(index: number, direction: -1 | 1): void {
+    if (this.replaceDraft) {
+      moveField(this.replaceDraft.fields, index, direction);
+    }
+  }
+
+  async createSchema(): Promise<void> {
     this.saving = true;
     this.clearCreateErrors();
 
     try {
-      const created = await this.contentTypeApi.createSchema(this.createSource);
+      const created = await this.contentTypeApi.createSchema(draftToYaml(this.createDraft));
       await this.refreshAfterWrite(created);
     } catch (error) {
       this.applyCreateError(error);
@@ -398,8 +580,8 @@ export class ContentTypeSchemasPageComponent implements OnInit {
     }
   }
 
-  async replaceFromYaml(): Promise<void> {
-    if (!this.selectedSchema) {
+  async replaceSchema(): Promise<void> {
+    if (!this.selectedSchema || !this.replaceDraft) {
       return;
     }
 
@@ -410,7 +592,7 @@ export class ContentTypeSchemasPageComponent implements OnInit {
       const replaced = await this.contentTypeApi.replaceSchemaVersion(
         this.selectedSchema.name,
         this.selectedSchema.version,
-        this.replaceSource
+        draftToYaml(this.replaceDraft)
       );
       await this.refreshAfterWrite(replaced);
     } catch (error) {
@@ -456,7 +638,7 @@ export class ContentTypeSchemasPageComponent implements OnInit {
       );
       this.selectedSchema = null;
       this.selectedSummary = null;
-      this.replaceSource = "";
+      this.replaceDraft = null;
       await this.loadSchemas();
     } catch (error) {
       const apiError = error as Partial<ApiClientError>;
@@ -474,6 +656,10 @@ export class ContentTypeSchemasPageComponent implements OnInit {
     const selected = this.selectedSummary;
 
     return selected !== null && summary.name === selected.name && summary.version === selected.version;
+  }
+
+  trackFieldByIndex(index: number): number {
+    return index;
   }
 
   private async refreshAfterWrite(schema: ContentTypeSchemaDefinition): Promise<void> {
@@ -541,26 +727,54 @@ export class ContentTypeSchemasPageComponent implements OnInit {
   }
 }
 
-function defaultSchemaSource(): string {
-  return `name: article
-version: 1.0
-fields:
-  title:
-    type: string
-    required: true
-`;
+function emptyFieldDraft(): SchemaFieldDraft {
+  return { name: "", type: "string", required: false };
 }
 
-function schemaToYaml(schema: ContentTypeSchemaDefinition): string {
-  const fields = Object.entries(schema.fields)
+function defaultCreateDraft(): SchemaDraft {
+  return {
+    name: "article",
+    version: "1.0",
+    fields: [{ name: "title", type: "string", required: true }]
+  };
+}
+
+function draftFromSchema(schema: ContentTypeSchemaDefinition): SchemaDraft {
+  return {
+    name: schema.name,
+    version: schema.version,
+    fields: schema.fields.map((field) => ({
+      name: field.name,
+      type: field.type,
+      required: field.required
+    }))
+  };
+}
+
+function moveField(fields: SchemaFieldDraft[], index: number, direction: -1 | 1): void {
+  const target = index + direction;
+
+  if (target < 0 || target >= fields.length) {
+    return;
+  }
+
+  const [moved] = fields.splice(index, 1);
+
+  if (moved) {
+    fields.splice(target, 0, moved);
+  }
+}
+
+function draftToYaml(draft: SchemaDraft): string {
+  const fields = draft.fields
     .map(
-      ([name, definition]) =>
-        `  ${name}:\n    type: ${definition.type}\n    required: ${definition.required}`
+      (field) =>
+        `  - name: ${field.name}\n    type: ${field.type}\n    required: ${field.required}`
     )
     .join("\n");
 
-  return `name: ${schema.name}
-version: ${schema.version}
+  return `name: ${draft.name}
+version: ${draft.version}
 fields:
 ${fields}
 `;

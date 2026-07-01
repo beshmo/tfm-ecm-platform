@@ -12,9 +12,7 @@ describe("content type schema domain", () => {
   const definition = {
     name: "generic",
     version: "1.0",
-    fields: {
-      title: { type: "string" as const, required: true }
-    }
+    fields: [{ name: "title", type: "string" as const, required: true }]
   };
 
   it("GIVEN a normalized definition WHEN a schema record is created THEN it is active", () => {

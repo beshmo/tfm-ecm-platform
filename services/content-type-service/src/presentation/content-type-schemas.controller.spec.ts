@@ -61,9 +61,7 @@ describe("content-type-service schema endpoints", () => {
       .expect({
         name: "article",
         version: "1.0",
-        fields: {
-          title: { type: "string", required: true }
-        }
+        fields: [{ name: "title", type: "string", required: true }]
       });
 
     await request(app.getHttpServer())
@@ -72,9 +70,7 @@ describe("content-type-service schema endpoints", () => {
       .expect({
         name: "article",
         version: "1.0",
-        fields: {
-          title: { type: "string", required: true }
-        }
+        fields: [{ name: "title", type: "string", required: true }]
       });
   });
 
@@ -91,9 +87,7 @@ describe("content-type-service schema endpoints", () => {
       .expect({
         name: "article",
         version: "1.0",
-        fields: {
-          headline: { type: "string", required: true }
-        }
+        fields: [{ name: "headline", type: "string", required: true }]
       });
   });
 
@@ -118,9 +112,7 @@ describe("content-type-service schema endpoints", () => {
       .expect({
         name: "article",
         version: "1.0",
-        fields: {
-          title: { type: "string", required: true }
-        }
+        fields: [{ name: "title", type: "string", required: true }]
       });
   });
 
@@ -203,7 +195,7 @@ function schemaSource(name: string, version: string, fieldName = "title"): strin
 name: ${name}
 version: ${version}
 fields:
-  ${fieldName}:
+  - name: ${fieldName}
     type: string
     required: true
 `;

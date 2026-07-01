@@ -898,14 +898,14 @@ name: generic
 version: 1.0
 
 fields:
-  title:
+  - name: title
     type: string
     required: true
 
-  description:
+  - name: description
     type: string
 
-  publishDate:
+  - name: publishDate
     type: date
 ```
 
@@ -1005,11 +1005,11 @@ Example:
 
 ```yaml
 fields:
-  title:
+  - name: title
     type: string
     required: true
 
-  description:
+  - name: description
     type: string
 ```
 

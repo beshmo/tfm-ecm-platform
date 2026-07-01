@@ -60,10 +60,14 @@ export interface ContentTypeFieldDefinition {
   required: boolean;
 }
 
+export interface ContentTypeSchemaField extends ContentTypeFieldDefinition {
+  name: string;
+}
+
 export interface ContentTypeSchemaDefinition {
   name: ContentTypeName;
   version: ContentTypeVersion;
-  fields: Record<string, ContentTypeFieldDefinition>;
+  fields: ContentTypeSchemaField[];
 }
 
 export interface ContentTypeSchemaSummary {
@@ -75,12 +79,12 @@ export interface ContentTypeSchemaSummary {
 export const INITIAL_GENERIC_CONTENT_TYPE_SCHEMA: ContentTypeSchemaDefinition = {
   name: "generic",
   version: "1.0",
-  fields: {
-    title: { type: "string", required: true },
-    priority: { type: "integer", required: false },
-    publishDate: { type: "date", required: false },
-    publishTime: { type: "time", required: false }
-  }
+  fields: [
+    { name: "title", type: "string", required: true },
+    { name: "priority", type: "integer", required: false },
+    { name: "publishDate", type: "date", required: false },
+    { name: "publishTime", type: "time", required: false }
+  ]
 };
 
 export type ContentInstanceData = Record<string, unknown>;
@@ -578,12 +582,12 @@ export function cmisTypeDefinitionFromSchema(
       propertyDefinition("ecmp:schemaVersion", "Schema Version", "string", true),
       propertyDefinition("ecmp:version", "Version", "integer", true),
       propertyDefinition("ecmp:status", "Status", "string", true),
-      ...Object.entries(schema.fields).map(([fieldName, definition]) =>
+      ...schema.fields.map((field) =>
         propertyDefinition(
-          `ecmp:${fieldName}`,
-          fieldName,
-          cmisPropertyTypeForContentField(definition.type),
-          definition.required,
+          `ecmp:${field.name}`,
+          field.name,
+          cmisPropertyTypeForContentField(field.type),
+          field.required,
           "readwrite"
         )
       )

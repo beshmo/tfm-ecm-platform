@@ -1,8 +1,8 @@
-import { isMap, isScalar, parseDocument, type YAMLMap } from "yaml";
+import { isMap, isScalar, isSeq, parseDocument, type YAMLMap, type YAMLSeq } from "yaml";
 import type {
   ContentFieldType,
-  ContentTypeFieldDefinition,
-  ContentTypeSchemaDefinition
+  ContentTypeSchemaDefinition,
+  ContentTypeSchemaField
 } from "@ecmp/shared-types";
 
 export interface SchemaParser {
@@ -22,7 +22,7 @@ export class SchemaValidationError extends Error {
 
 export const DEFAULT_MAX_SCHEMA_SOURCE_BYTES = 64 * 1024;
 const TOP_LEVEL_KEYS = new Set(["name", "version", "fields"]);
-const FIELD_KEYS = new Set(["type", "required"]);
+const FIELD_KEYS = new Set(["name", "type", "required"]);
 const SUPPORTED_FIELD_TYPES = new Set<ContentFieldType>([
   "string",
   "integer",
@@ -98,13 +98,15 @@ export class StrictYamlSchemaParser implements SchemaParser {
     validateContentTypeName(name, issues);
     validateVersion(version, issues);
 
-    if (!isMap(fieldsNode)) {
-      issues.push("Schema fields must be a mapping.");
+    if (isMap(fieldsNode)) {
+      issues.push("Schema fields must be an ordered sequence, not a mapping.");
+    } else if (!isSeq(fieldsNode)) {
+      issues.push("Schema fields must be an ordered sequence.");
     }
 
-    const fields = isMap(fieldsNode) ? readFields(fieldsNode, issues) : {};
+    const fields = isSeq(fieldsNode) ? readFields(fieldsNode, issues) : [];
 
-    if (Object.keys(fields).length === 0) {
+    if (fields.length === 0 && !issues.some((issue) => issue.startsWith("Schema fields"))) {
       issues.push("Schema must define at least one field.");
     }
 
@@ -125,36 +127,44 @@ function byteLength(value: string): number {
 }
 
 function readFields(
-  fieldsMap: YAMLMap<unknown, unknown>,
+  fieldsSeq: YAMLSeq<unknown>,
   issues: string[]
-): Record<string, ContentTypeFieldDefinition> {
-  const fields: Record<string, ContentTypeFieldDefinition> = {};
+): ContentTypeSchemaField[] {
+  const fields: ContentTypeSchemaField[] = [];
+  const seenNames = new Set<string>();
 
-  for (const item of fieldsMap.items) {
-    const fieldName = scalarToString(item.key);
+  for (const item of fieldsSeq.items) {
+    if (!isMap(item)) {
+      issues.push("Each field entry must be a mapping.");
+      continue;
+    }
+
+    const fieldEntry = readMap(item, "field entry", issues);
+
+    for (const key of Object.keys(fieldEntry)) {
+      if (!FIELD_KEYS.has(key)) {
+        issues.push(`Unsupported key '${key}' in field entry.`);
+      }
+    }
+
+    const fieldName = scalarToString(fieldEntry["name"]);
 
     if (!fieldName) {
-      issues.push("Field names must be non-empty scalar values.");
+      issues.push("Each field entry must define a non-empty name.");
       continue;
     }
 
     validateFieldName(fieldName, issues);
 
-    if (!isMap(item.value)) {
-      issues.push(`Field '${fieldName}' must be a mapping.`);
+    if (seenNames.has(fieldName)) {
+      issues.push(`Duplicate field name '${fieldName}'.`);
       continue;
     }
 
-    const fieldDefinition = readMap(item.value, `field '${fieldName}'`, issues);
+    seenNames.add(fieldName);
 
-    for (const key of Object.keys(fieldDefinition)) {
-      if (!FIELD_KEYS.has(key)) {
-        issues.push(`Unsupported key '${key}' in field '${fieldName}'.`);
-      }
-    }
-
-    const type = scalarToString(fieldDefinition["type"]);
-    const required = readOptionalBoolean(fieldDefinition["required"], fieldName, issues);
+    const type = scalarToString(fieldEntry["type"]);
+    const required = readOptionalBoolean(fieldEntry["required"], fieldName, issues);
 
     if (!type) {
       issues.push(`Field '${fieldName}' must define a type.`);
@@ -166,10 +176,11 @@ function readFields(
       continue;
     }
 
-    fields[fieldName] = {
+    fields.push({
+      name: fieldName,
       type: type as ContentFieldType,
       required
-    };
+    });
   }
 
   return fields;

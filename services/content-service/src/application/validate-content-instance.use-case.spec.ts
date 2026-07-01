@@ -9,11 +9,11 @@ describe("validate content instance use case", () => {
   it("GIVEN no schema version WHEN content is validated THEN latest active schema is used by default", async () => {
     const useCase = new ValidateContentInstanceUseCase(
       new InMemoryContentTypeSchemaReader([
-        schema("article", "1.0", { title: { type: "string", required: true } }),
-        schema("article", "1.2", {
-          title: { type: "string", required: true },
-          priority: { type: "integer", required: true }
-        })
+        schema("article", "1.0", [{ name: "title", type: "string", required: true }]),
+        schema("article", "1.2", [
+          { name: "title", type: "string", required: true },
+          { name: "priority", type: "integer", required: true }
+        ])
       ])
     );
 
@@ -33,11 +33,11 @@ describe("validate content instance use case", () => {
   it("GIVEN an explicit schema version WHEN content is validated THEN the requested schema version is used", async () => {
     const useCase = new ValidateContentInstanceUseCase(
       new InMemoryContentTypeSchemaReader([
-        schema("article", "1.0", { title: { type: "string", required: true } }),
-        schema("article", "2.0", {
-          title: { type: "string", required: true },
-          priority: { type: "integer", required: true }
-        })
+        schema("article", "1.0", [{ name: "title", type: "string", required: true }]),
+        schema("article", "2.0", [
+          { name: "title", type: "string", required: true },
+          { name: "priority", type: "integer", required: true }
+        ])
       ])
     );
 
@@ -66,10 +66,10 @@ describe("validate content instance use case", () => {
   it("GIVEN multiple invalid fields WHEN content is validated THEN all validation errors are returned together", async () => {
     const useCase = new ValidateContentInstanceUseCase(
       new InMemoryContentTypeSchemaReader([
-        schema("article", "1.0", {
-          title: { type: "string", required: true },
-          publishDate: { type: "date", required: false }
-        })
+        schema("article", "1.0", [
+          { name: "title", type: "string", required: true },
+          { name: "publishDate", type: "date", required: false }
+        ])
       ])
     );
 

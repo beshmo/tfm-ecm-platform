@@ -18,11 +18,11 @@ describe("in-memory content type schema repository", () => {
     await repository.save(createContentTypeSchemaRecord(schemaDefinition("generic", "1.0")));
 
     const stored = await repository.findByNameAndVersion("generic", "1.0");
-    stored!.definition.fields["title"]!.required = false;
+    stored!.definition.fields[0]!.required = false;
 
     const reread = await repository.findByNameAndVersion("generic", "1.0");
 
-    expect(reread?.definition.fields["title"]?.required).toBe(true);
+    expect(reread?.definition.fields[0]?.required).toBe(true);
   });
 
   it("GIVEN a saved schema record WHEN it is replaced THEN the same identity returns the replacement", async () => {
@@ -35,11 +35,14 @@ describe("in-memory content type schema repository", () => {
 
     const replaced = await repository.findByNameAndVersion("generic", "1.0");
 
-    expect(replaced?.definition.fields["headline"]).toEqual({
+    expect(replaced?.definition.fields.find((field) => field.name === "headline")).toEqual({
+      name: "headline",
       type: "string",
       required: true
     });
-    expect(replaced?.definition.fields["title"]).toBeUndefined();
+    expect(
+      replaced?.definition.fields.find((field) => field.name === "title")
+    ).toBeUndefined();
   });
 
   it("GIVEN multiple active versions WHEN latest active is requested THEN semantic version ordering is used", async () => {
@@ -91,11 +94,12 @@ function schemaDefinition(name: string, version: string, fieldName = "title") {
   return {
     name,
     version,
-    fields: {
-      [fieldName]: {
+    fields: [
+      {
+        name: fieldName,
         type: "string" as const,
         required: true
       }
-    }
+    ]
   };
 }

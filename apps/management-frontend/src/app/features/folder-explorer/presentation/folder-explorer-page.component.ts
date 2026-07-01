@@ -372,9 +372,9 @@ export class FolderExplorerPageComponent implements OnInit, OnChanges {
 
   set currentSchema(schema: ContentTypeSchemaDefinition | null) {
     this._currentSchema = schema;
-    this.schemaFields = Object.entries(schema?.fields ?? {}).map(([name, definition]) => ({
-      name,
-      definition
+    this.schemaFields = (schema?.fields ?? []).map((field) => ({
+      name: field.name,
+      definition: field
     }));
   }
 
@@ -698,10 +698,7 @@ function createEmptyFormData(
   schema: ContentTypeSchemaDefinition
 ): Record<string, string | number | null> {
   return Object.fromEntries(
-    Object.entries(schema.fields).map(([fieldName, definition]) => [
-      fieldName,
-      definition.type === "integer" ? null : ""
-    ])
+    schema.fields.map((field) => [field.name, field.type === "integer" ? null : ""])
   );
 }
 
@@ -710,10 +707,10 @@ function createFormData(
   data: Record<string, unknown>
 ): Record<string, string | number | null> {
   return Object.fromEntries(
-    Object.keys(schema.fields).map((fieldName) => {
-      const value = data[fieldName];
+    schema.fields.map((field) => {
+      const value = data[field.name];
 
-      return [fieldName, typeof value === "string" || typeof value === "number" ? value : ""];
+      return [field.name, typeof value === "string" || typeof value === "number" ? value : ""];
     })
   );
 }
@@ -724,14 +721,14 @@ function toContentData(
 ): Record<string, unknown> {
   const data: Record<string, unknown> = {};
 
-  for (const [fieldName, definition] of Object.entries(schema.fields)) {
-    const value = formData[fieldName];
+  for (const field of schema.fields) {
+    const value = formData[field.name];
 
     if (value === "" || value === null) {
       continue;
     }
 
-    data[fieldName] = definition.type === "integer" ? Number(value) : value;
+    data[field.name] = field.type === "integer" ? Number(value) : value;
   }
 
   return data;

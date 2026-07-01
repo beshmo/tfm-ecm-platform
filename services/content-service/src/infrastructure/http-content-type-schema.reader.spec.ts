@@ -15,7 +15,7 @@ function schema(name: string, version: string) {
   return {
     name,
     version,
-    fields: { title: { type: "string" as const, required: true } }
+    fields: [{ name: "title", type: "string" as const, required: true }]
   };
 }
 

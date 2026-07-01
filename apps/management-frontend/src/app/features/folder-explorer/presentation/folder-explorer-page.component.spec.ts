@@ -125,10 +125,10 @@ describe("folder explorer page component", () => {
     const articleSchema: ContentTypeSchemaDefinition = {
       name: "article",
       version: "1.0",
-      fields: {
-        headline: { type: "string", required: true },
-        priority: { type: "integer", required: false }
-      }
+      fields: [
+        { name: "headline", type: "string", required: true },
+        { name: "priority", type: "integer", required: false }
+      ]
     };
     contentTypeApi.listSchemas.mockResolvedValueOnce([
       { name: "generic", version: "1.0", active: true },
@@ -153,6 +153,7 @@ describe("folder explorer page component", () => {
     expect(contentTypeApi.getLatestSchema).toHaveBeenLastCalledWith("article");
     expect(component.selectedContentTypeName).toBe("article");
     expect(component.formData).toEqual({ headline: "", priority: null });
+    expect(articleFields.map((field) => field.name)).toEqual(["headline", "priority"]);
     expect(articleFields).not.toBe(genericFields);
     expect(component.schemaFields).toBe(articleFields);
   });
