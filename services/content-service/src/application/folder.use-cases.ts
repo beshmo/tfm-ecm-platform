@@ -1,4 +1,5 @@
 import type { FolderCreateInput, FolderId, FolderUpdateInput } from "@ecmp/shared-types";
+import { SYSTEM_FOLDER_ID } from "@ecmp/shared-types";
 
 import type { FolderContentReader } from "../domain/folder-content.reader";
 import type { FolderIdGenerator } from "../domain/folder-id-generator";
@@ -7,17 +8,25 @@ import {
   createFolderRecord,
   FolderNameValidationError,
   isRootFolderId,
+  moveFolderRecord,
   normalizeFolderName,
   renameFolderRecord,
   type FolderRecord
 } from "../domain/folder";
 import type { FolderRepository } from "../domain/folder.repository";
 import {
+  isProtectedSystemFolderId,
+  isSchemaNamespacePath,
+  isSystemNamespacePath
+} from "../domain/system-folder";
+import {
   DuplicateFolderNameError,
   FolderNotEmptyError,
   FolderNotFoundError,
+  FolderSchemaNamespaceError,
   InvalidFolderNameError,
   ParentFolderNotFoundError,
+  ProtectedFolderOperationNotAllowedError,
   RootFolderOperationNotAllowedError
 } from "./folder.errors";
 
@@ -67,6 +76,12 @@ export class CreateFolderUseCase {
       throw new ParentFolderNotFoundError(input.parentFolderId);
     }
 
+    if (parent.folderId === SYSTEM_FOLDER_ID) {
+      throw new FolderSchemaNamespaceError(
+        "Folders cannot be created directly under the '/system' namespace."
+      );
+    }
+
     const name = normalizeApplicationFolderName(input.name);
     await ensureUniqueSiblingName(this.repository, input.parentFolderId, name);
 
@@ -98,6 +113,10 @@ export class RenameFolderUseCase {
       throw new RootFolderOperationNotAllowedError("rename");
     }
 
+    if (isProtectedSystemFolderId(folder.folderId)) {
+      throw new ProtectedFolderOperationNotAllowedError("rename");
+    }
+
     if (!folder.parentFolderId) {
       throw new ParentFolderNotFoundError(folder.folderId);
     }
@@ -123,6 +142,65 @@ export class RenameFolderUseCase {
   }
 }
 
+export class MoveFolderUseCase {
+  constructor(
+    private readonly repository: FolderRepository,
+    private readonly clock: Clock = () => new Date()
+  ) {}
+
+  async execute(folderId: FolderId, targetParentFolderId: FolderId): Promise<FolderRecord> {
+    const folder = await this.repository.findById(folderId);
+
+    if (!folder) {
+      throw new FolderNotFoundError(folderId);
+    }
+
+    if (isRootFolderId(folder.folderId)) {
+      throw new RootFolderOperationNotAllowedError("rename");
+    }
+
+    if (isProtectedSystemFolderId(folder.folderId)) {
+      throw new ProtectedFolderOperationNotAllowedError("move");
+    }
+
+    const target = await this.repository.findById(targetParentFolderId);
+
+    if (!target) {
+      throw new ParentFolderNotFoundError(targetParentFolderId);
+    }
+
+    if (target.folderId === folder.folderId || target.path.startsWith(`${folder.path}/`)) {
+      throw new FolderSchemaNamespaceError(
+        "A folder cannot be moved into itself or one of its descendants."
+      );
+    }
+
+    if (isSchemaNamespacePath(folder.path)) {
+      if (!isSchemaNamespacePath(target.path)) {
+        throw new FolderSchemaNamespaceError(
+          "Schema folders must remain within the '/system/schemas' namespace."
+        );
+      }
+    } else if (isSystemNamespacePath(target.path)) {
+      throw new FolderSchemaNamespaceError(
+        "Only schema folders may be moved into the '/system' namespace."
+      );
+    }
+
+    await ensureUniqueSiblingName(this.repository, target.folderId, folder.name, folder.folderId);
+
+    const now = this.clock();
+    const moved = moveFolderRecord(folder, target, now);
+    const descendants = (await this.repository.list())
+      .filter((candidate) => candidate.path.startsWith(`${folder.path}/`))
+      .map((descendant) => applyRenamedAncestorPath(descendant, folder.path, moved.path, now));
+
+    await this.repository.replaceMany([moved, ...descendants]);
+
+    return moved;
+  }
+}
+
 export class DeleteFolderUseCase {
   constructor(
     private readonly repository: FolderRepository,
@@ -138,6 +216,10 @@ export class DeleteFolderUseCase {
 
     if (isRootFolderId(folder.folderId)) {
       throw new RootFolderOperationNotAllowedError("delete");
+    }
+
+    if (isProtectedSystemFolderId(folder.folderId)) {
+      throw new ProtectedFolderOperationNotAllowedError("delete");
     }
 
     const children = await this.repository.listByParentFolderId(folder.folderId);

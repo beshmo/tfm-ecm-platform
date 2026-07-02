@@ -20,3 +20,10 @@ export class ContentFolderNotFoundError extends Error {
     this.name = "ContentFolderNotFoundError";
   }
 }
+
+export class ContentSystemNamespaceError extends Error {
+  constructor(folderId: FolderId) {
+    super(`Content records cannot be created in the system namespace folder '${folderId}'.`);
+    this.name = "ContentSystemNamespaceError";
+  }
+}

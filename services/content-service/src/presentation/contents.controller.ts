@@ -29,6 +29,7 @@ import { ContentTypeSchemaNotFoundError } from "../application/content-validatio
 import {
   ContentFolderNotFoundError,
   ContentNotFoundError,
+  ContentSystemNamespaceError,
   InvalidContentDataError
 } from "../application/content.errors";
 import {
@@ -257,7 +258,10 @@ function mapContentError(error: unknown): Error {
     return new NotFoundException(error.message);
   }
 
-  if (error instanceof ImmutableContentTypeError) {
+  if (
+    error instanceof ImmutableContentTypeError ||
+    error instanceof ContentSystemNamespaceError
+  ) {
     return new ConflictException(error.message);
   }
 

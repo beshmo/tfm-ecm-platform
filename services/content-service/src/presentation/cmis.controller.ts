@@ -47,6 +47,7 @@ import { ContentTypeSchemaNotFoundError } from "../application/content-validatio
 import {
   ContentFolderNotFoundError,
   ContentNotFoundError,
+  ContentSystemNamespaceError,
   InvalidContentDataError
 } from "../application/content.errors";
 import {
@@ -58,8 +59,10 @@ import {
   DuplicateFolderNameError,
   FolderNotEmptyError,
   FolderNotFoundError,
+  FolderSchemaNamespaceError,
   InvalidFolderNameError,
   ParentFolderNotFoundError,
+  ProtectedFolderOperationNotAllowedError,
   RootFolderOperationNotAllowedError
 } from "../application/folder.errors";
 import {
@@ -74,6 +77,7 @@ import {
   StaticFileFolderNotFoundError,
   StaticFileNotFoundError,
   StaticFileStorageError,
+  StaticFileSystemNamespaceError,
   StaticFileUploadTooLargeError,
   UnsupportedStaticFileUploadMimeTypeError
 } from "../application/static-file.errors";
@@ -86,6 +90,7 @@ import {
 import type { ContentRecordEntity } from "../domain/content";
 import type { ContentTypeSchemaReader } from "../domain/content-type-schema.reader";
 import type { FolderRecord } from "../domain/folder";
+import { isSystemNamespacePath } from "../domain/system-folder";
 import {
   MAX_STATIC_FILE_SIZE_BYTES,
   type StaticFileEntity
@@ -179,10 +184,15 @@ export class CmisController {
         this.listStaticFiles.execute(folderId as FolderId),
         this.listContents.execute(folderId as FolderId)
       ]);
+      // The `/system/schemas` administrative namespace is not exposed as normal
+      // CMIS authoring content in this slice.
+      const authoringFolders = folders.filter((folder) => !isSystemNamespacePath(folder.path));
 
       return {
         objects: [
-          ...folders.map((folder) => cmisObjectFromFolder(toFolderResponse(folder), permissions)),
+          ...authoringFolders.map((folder) =>
+            cmisObjectFromFolder(toFolderResponse(folder), permissions)
+          ),
           ...files.map((file) => cmisObjectFromStaticFile(toStaticFileResponse(file), permissions)),
           ...contents.map((content) =>
             cmisObjectFromContentRecord(toContentResponse(content), permissions)
@@ -372,10 +382,13 @@ export class CmisController {
   private async resolveObject(objectId: string, permissions: Permission[]) {
     try {
       if (objectId.startsWith("FLD-")) {
-        return cmisObjectFromFolder(
-          toFolderResponse(await this.getFolder.execute(objectId as FolderId)),
-          permissions
-        );
+        const folder = await this.getFolder.execute(objectId as FolderId);
+
+        if (isSystemNamespacePath(folder.path)) {
+          throw new CmisHttpException("notFound", `CMIS object '${objectId}' was not found.`, 404);
+        }
+
+        return cmisObjectFromFolder(toFolderResponse(folder), permissions);
       }
 
       if (objectId.startsWith("STF-")) {
@@ -400,7 +413,15 @@ export class CmisController {
 
   private async resolveObjectByPath(requestedPath: string, permissions: Permission[]) {
     const normalizedPath = requestedPath === "" ? "/" : requestedPath;
-    const folders = await this.listFolders.execute();
+
+    // The schema administration namespace is not resolvable through CMIS.
+    if (isSystemNamespacePath(normalizedPath)) {
+      return null;
+    }
+
+    const folders = (await this.listFolders.execute()).filter(
+      (candidate) => !isSystemNamespacePath(candidate.path)
+    );
     const folder = folders.find((candidate) => candidate.path === normalizedPath);
 
     if (folder) {
@@ -569,7 +590,11 @@ function mapCmisError(error: unknown): Error {
   if (
     error instanceof DuplicateFolderNameError ||
     error instanceof RootFolderOperationNotAllowedError ||
-    error instanceof FolderNotEmptyError
+    error instanceof FolderNotEmptyError ||
+    error instanceof ProtectedFolderOperationNotAllowedError ||
+    error instanceof FolderSchemaNamespaceError ||
+    error instanceof ContentSystemNamespaceError ||
+    error instanceof StaticFileSystemNamespaceError
   ) {
     return new CmisHttpException("constraint", error.message, 409);
   }

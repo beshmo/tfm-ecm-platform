@@ -228,6 +228,30 @@ describe("content-service CMIS Browser Binding adapter", () => {
       .expect({ deleted: true, objectId: folder.objectId });
   });
 
+  it("GIVEN the schema administration namespace WHEN CMIS navigation is used THEN it is not exposed", async () => {
+    app = await createApp();
+
+    // Root children must not include the reserved /system namespace folder.
+    await request(app.getHttpServer())
+      .get(`/api/cmis/${CMIS_REPOSITORY_ID}/children/FLD-root`)
+      .set("x-ecmp-permissions", "folder:read")
+      .expect(200)
+      .expect((response) => {
+        const objectIds = response.body.objects.map((object: { objectId: string }) => object.objectId);
+        expect(objectIds).not.toContain("FLD-system");
+      });
+
+    // The schema namespace cannot be resolved by id or path.
+    await request(app.getHttpServer())
+      .get(`/api/cmis/${CMIS_REPOSITORY_ID}/object/FLD-system-schemas`)
+      .expect(404);
+
+    await request(app.getHttpServer())
+      .get(`/api/cmis/${CMIS_REPOSITORY_ID}/object-by-path`)
+      .query({ path: "/system/schemas" })
+      .expect(404);
+  });
+
   it("GIVEN unsupported or forbidden CMIS requests WHEN sent THEN CMIS errors are returned", async () => {
     app = await createApp();
 

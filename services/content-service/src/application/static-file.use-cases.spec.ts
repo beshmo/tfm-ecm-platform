@@ -1,9 +1,11 @@
 import type { FolderId, StaticFileId } from "@ecmp/shared-types";
-import { ROOT_FOLDER_ID } from "@ecmp/shared-types";
+import { ROOT_FOLDER_ID, SYSTEM_SCHEMAS_FOLDER_ID } from "@ecmp/shared-types";
 import { describe, expect, it, vi } from "vitest";
 
+import { createRootFolder } from "../domain/folder";
 import type { StaticFileIdGenerator } from "../domain/static-file-id-generator";
 import type { StaticFileStorage, StaticFileStorageSaveInput } from "../domain/static-file.storage";
+import { createSystemFolder, createSystemSchemasFolder } from "../domain/system-folder";
 import { InMemoryFolderRepository } from "../infrastructure/in-memory-folder.repository";
 import { InMemoryStaticFileRepository } from "../infrastructure/in-memory-static-file.repository";
 import {
@@ -12,6 +14,7 @@ import {
   StaticFileFolderNotFoundError,
   StaticFileNotFoundError,
   StaticFileStorageError,
+  StaticFileSystemNamespaceError,
   StaticFileUploadTooLargeError,
   UnsupportedStaticFileUploadMimeTypeError
 } from "./static-file.errors";
@@ -52,6 +55,24 @@ describe("document use cases", () => {
     await expect(repository.findById(file.fileId)).resolves.toMatchObject({
       filename: "manual.pdf"
     });
+  });
+
+  it("GIVEN the system schema namespace WHEN a document is uploaded there THEN it is rejected", async () => {
+    const useCase = new UploadStaticFileUseCase(
+      new InMemoryStaticFileRepository(),
+      new InMemoryFolderRepository([
+        createRootFolder(),
+        createSystemFolder(),
+        createSystemSchemasFolder()
+      ]),
+      new MemoryStaticFileStorage(),
+      new StaticStaticFileIdGenerator("STF-file1" as StaticFileId),
+      () => now
+    );
+
+    await expect(
+      useCase.execute(upload({ folderId: SYSTEM_SCHEMAS_FOLDER_ID }))
+    ).rejects.toBeInstanceOf(StaticFileSystemNamespaceError);
   });
 
   it("GIVEN files in folders WHEN listed THEN only matching folder files are returned", async () => {

@@ -4,12 +4,13 @@ import type {
   ContentTypeSchemaDefinition,
   FolderId
 } from "@ecmp/shared-types";
-import { ROOT_FOLDER_ID } from "@ecmp/shared-types";
+import { ROOT_FOLDER_ID, SYSTEM_SCHEMAS_FOLDER_ID } from "@ecmp/shared-types";
 import { describe, expect, it } from "vitest";
 
 import type { ContentIdGenerator } from "../domain/content-id-generator";
 import { createContentRecord, ImmutableContentTypeError } from "../domain/content";
 import { createFolderRecord, createRootFolder } from "../domain/folder";
+import { createSystemFolder, createSystemSchemasFolder } from "../domain/system-folder";
 import { InMemoryContentRepository } from "../infrastructure/in-memory-content.repository";
 import { InMemoryContentTypeSchemaReader } from "../infrastructure/in-memory-content-type-schema.reader";
 import { InMemoryFolderRepository } from "../infrastructure/in-memory-folder.repository";
@@ -17,6 +18,7 @@ import { ContentTypeSchemaNotFoundError } from "./content-validation.errors";
 import {
   ContentFolderNotFoundError,
   ContentNotFoundError,
+  ContentSystemNamespaceError,
   InvalidContentDataError
 } from "./content.errors";
 import {
@@ -129,6 +131,31 @@ describe("content use cases", () => {
         data: { title: 1 }
       })
     ).rejects.toBeInstanceOf(InvalidContentDataError);
+  });
+
+  it("GIVEN the system schema namespace WHEN a content record is created there THEN it is rejected", async () => {
+    const { repository, schemaReader } = fixtures();
+    const folderRepository = new InMemoryFolderRepository([
+      createRootFolder(),
+      createSystemFolder(),
+      createSystemSchemasFolder()
+    ]);
+    const useCase = new CreateContentUseCase(
+      repository,
+      folderRepository,
+      schemaReader,
+      new StaticContentIdGenerator("RCD-generated" as ContentId),
+      () => now
+    );
+
+    await expect(
+      useCase.execute({
+        folderId: SYSTEM_SCHEMAS_FOLDER_ID,
+        contentType: "article",
+        schemaVersion: "1.0",
+        data: { title: "Welcome" }
+      })
+    ).rejects.toBeInstanceOf(ContentSystemNamespaceError);
   });
 
   it("GIVEN content exists WHEN replaced THEN stored schema can be reused and version increments", async () => {

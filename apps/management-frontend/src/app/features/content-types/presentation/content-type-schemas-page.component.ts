@@ -3,11 +3,15 @@ import { Component, Inject, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import type {
   ContentFieldType,
+  ContentTypeDefinition,
   ContentTypeName,
   ContentTypeSchemaDefinition,
   ContentTypeSchemaSummary,
-  ContentTypeVersion
+  ContentTypeVersion,
+  Folder,
+  FolderId
 } from "@ecmp/shared-types";
+import { SYSTEM_SCHEMAS_FOLDER_ID } from "@ecmp/shared-types";
 
 import type { ApiClientError } from "../../../shared/infrastructure/api-client-error";
 import { ContentTypeApiClient } from "../infrastructure/content-type-api.client";
@@ -51,6 +55,97 @@ const FIELD_TYPES: readonly ContentFieldType[] = [
           Refresh
         </button>
       </header>
+
+      <section class="schema-folders" aria-label="Schema folder browser">
+        <div class="content-header">
+          <h2>Schema Folders</h2>
+          <button type="button" class="secondary" (click)="loadSchemaFolderContext()" [disabled]="folderLoading">
+            Refresh folders
+          </button>
+        </div>
+
+        <nav aria-label="Schema folder breadcrumb" class="breadcrumb">
+          <button
+            *ngFor="let crumb of schemaFolderCrumbs; let i = index; trackBy: trackFolderById"
+            type="button"
+            class="secondary crumb"
+            [disabled]="i === schemaFolderCrumbs.length - 1"
+            (click)="goToSchemaCrumb(i)"
+          >
+            {{ crumb.name }}
+          </button>
+        </nav>
+
+        <p *ngIf="folderLoading" class="empty">Loading schema folders...</p>
+        <p *ngIf="folderErrorMessage" class="error">{{ folderErrorMessage }}</p>
+
+        <div class="folder-grid">
+          <div aria-label="Schema subfolders">
+            <h3>Subfolders</h3>
+            <p *ngIf="schemaSubfolders.length === 0 && !folderLoading" class="empty">
+              No schema subfolders.
+            </p>
+            <button
+              *ngFor="let folder of schemaSubfolders; trackBy: trackFolderById"
+              type="button"
+              class="schema-button"
+              [attr.aria-label]="'Open ' + folder.name"
+              (click)="enterSchemaFolder(folder)"
+            >
+              <strong>{{ folder.name }}</strong>
+              <span>{{ folder.path }}</span>
+            </button>
+
+            <form (ngSubmit)="createSchemaFolder()" aria-label="Create schema folder">
+              <label>
+                New folder
+                <input name="newSchemaFolderName" [(ngModel)]="newSchemaFolderName" />
+              </label>
+              <p *ngIf="createFolderErrorMessage" class="error">{{ createFolderErrorMessage }}</p>
+              <button type="submit" [disabled]="folderSaving">Create folder</button>
+            </form>
+          </div>
+
+          <div aria-label="Content type definitions">
+            <h3>Content Type Definitions</h3>
+            <p *ngIf="definitions.length === 0 && !folderLoading" class="empty">
+              No content type definitions in this folder.
+            </p>
+            <p *ngIf="moveErrorMessage" class="error">{{ moveErrorMessage }}</p>
+            <div
+              class="definition-row"
+              *ngFor="let definition of definitions; trackBy: trackDefinitionById"
+            >
+              <strong>{{ definition.name }}</strong>
+              <span>{{ definition.versions.length }} versions</span>
+              <select
+                [attr.data-name]="'moveTarget-' + definition.name"
+                [name]="'moveTarget-' + definition.name"
+                [ngModel]="moveTargetFolderId"
+                (ngModelChange)="moveTargetFolderId = $event"
+                aria-label="Move target folder"
+              >
+                <option value="">Choose folder...</option>
+                <option
+                  *ngFor="let folder of moveCandidateFolders; trackBy: trackFolderById"
+                  [value]="folder.folderId"
+                >
+                  {{ folder.path }}
+                </option>
+              </select>
+              <button
+                type="button"
+                class="secondary"
+                [attr.aria-label]="'Move ' + definition.name"
+                (click)="moveDefinition(definition)"
+                [disabled]="folderSaving || !moveTargetFolderId"
+              >
+                Move
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section class="workspace" aria-label="Content type schema administration">
         <aside aria-label="Content type schemas">
@@ -450,6 +545,41 @@ const FIELD_TYPES: readonly ContentFieldType[] = [
         white-space: nowrap;
       }
 
+      .schema-folders {
+        background: #ffffff;
+        border: 1px solid #d7dde3;
+        margin: 1rem 1rem 0;
+        padding: 1rem;
+      }
+
+      .breadcrumb {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        margin-top: 0.5rem;
+      }
+
+      .crumb:disabled {
+        background: #124b7c;
+        opacity: 1;
+      }
+
+      .folder-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin-top: 1rem;
+      }
+
+      .definition-row {
+        align-items: center;
+        border-bottom: 1px solid #d7dde3;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 0.5rem 0;
+      }
+
       .empty {
         color: #52606d;
         margin-top: 1rem;
@@ -493,6 +623,17 @@ export class ContentTypeSchemasPageComponent implements OnInit {
   createValidationMessages: string[] = [];
   replaceErrorMessage = "";
   replaceValidationMessages: string[] = [];
+  schemaFolderCrumbs: Folder[] = [];
+  schemaSubfolders: Folder[] = [];
+  definitions: ContentTypeDefinition[] = [];
+  moveCandidateFolders: Folder[] = [];
+  folderLoading = false;
+  folderSaving = false;
+  folderErrorMessage = "";
+  createFolderErrorMessage = "";
+  moveErrorMessage = "";
+  newSchemaFolderName = "";
+  moveTargetFolderId: FolderId | "" = "";
 
   constructor(
     @Inject(ContentTypeApiClient)
@@ -501,6 +642,113 @@ export class ContentTypeSchemasPageComponent implements OnInit {
 
   ngOnInit(): void {
     void this.loadSchemas();
+    void this.loadSchemaFolderContext();
+  }
+
+  async loadSchemaFolderContext(): Promise<void> {
+    this.folderLoading = true;
+    this.folderErrorMessage = "";
+
+    try {
+      if (this.schemaFolderCrumbs.length === 0) {
+        const root = await this.contentTypeApi.getSchemaFolder(SYSTEM_SCHEMAS_FOLDER_ID);
+        this.schemaFolderCrumbs = [root];
+      }
+
+      const currentId = this.currentSchemaFolderId();
+      const [subfolders, definitions] = await Promise.all([
+        this.contentTypeApi.listSchemaSubfolders(currentId),
+        this.contentTypeApi.listContentTypeDefinitions(currentId)
+      ]);
+
+      this.schemaSubfolders = subfolders;
+      this.definitions = definitions;
+      this.recomputeMoveCandidates();
+    } catch (error) {
+      this.folderErrorMessage = (error as Partial<ApiClientError>).message ?? "Request failed.";
+    } finally {
+      this.folderLoading = false;
+    }
+  }
+
+  async enterSchemaFolder(folder: Folder): Promise<void> {
+    this.schemaFolderCrumbs = [...this.schemaFolderCrumbs, folder];
+    this.moveTargetFolderId = "";
+    await this.loadSchemaFolderContext();
+  }
+
+  async goToSchemaCrumb(index: number): Promise<void> {
+    this.schemaFolderCrumbs = this.schemaFolderCrumbs.slice(0, index + 1);
+    this.moveTargetFolderId = "";
+    await this.loadSchemaFolderContext();
+  }
+
+  async createSchemaFolder(): Promise<void> {
+    const name = this.newSchemaFolderName.trim();
+
+    if (name.length === 0) {
+      return;
+    }
+
+    this.folderSaving = true;
+    this.createFolderErrorMessage = "";
+
+    try {
+      await this.contentTypeApi.createSchemaFolder(name, this.currentSchemaFolderId());
+      this.newSchemaFolderName = "";
+      await this.loadSchemaFolderContext();
+    } catch (error) {
+      this.createFolderErrorMessage =
+        (error as Partial<ApiClientError>).message ?? "Request failed.";
+    } finally {
+      this.folderSaving = false;
+    }
+  }
+
+  async moveDefinition(definition: ContentTypeDefinition): Promise<void> {
+    if (!this.moveTargetFolderId) {
+      return;
+    }
+
+    this.folderSaving = true;
+    this.moveErrorMessage = "";
+
+    try {
+      await this.contentTypeApi.moveContentTypeDefinition(
+        definition.name,
+        this.moveTargetFolderId
+      );
+      this.moveTargetFolderId = "";
+      await this.loadSchemaFolderContext();
+    } catch (error) {
+      this.moveErrorMessage = (error as Partial<ApiClientError>).message ?? "Request failed.";
+    } finally {
+      this.folderSaving = false;
+    }
+  }
+
+  trackFolderById(_index: number, folder: Folder): string {
+    return folder.folderId;
+  }
+
+  trackDefinitionById(_index: number, definition: ContentTypeDefinition): string {
+    return definition.contentTypeDefinitionId;
+  }
+
+  private currentSchemaFolderId(): FolderId {
+    const current = this.schemaFolderCrumbs[this.schemaFolderCrumbs.length - 1];
+
+    return current ? current.folderId : SYSTEM_SCHEMAS_FOLDER_ID;
+  }
+
+  private recomputeMoveCandidates(): void {
+    const byId = new Map<FolderId, Folder>();
+
+    for (const folder of [...this.schemaFolderCrumbs, ...this.schemaSubfolders]) {
+      byId.set(folder.folderId, folder);
+    }
+
+    this.moveCandidateFolders = Array.from(byId.values());
   }
 
   async loadSchemas(): Promise<void> {
@@ -581,7 +829,10 @@ export class ContentTypeSchemasPageComponent implements OnInit {
     this.clearCreateErrors();
 
     try {
-      const created = await this.contentTypeApi.createSchema(draftToYaml(this.createDraft));
+      const created = await this.contentTypeApi.createSchema(
+        draftToYaml(this.createDraft),
+        this.currentSchemaFolderId()
+      );
       await this.refreshAfterWrite(created);
     } catch (error) {
       this.applyCreateError(error);
@@ -680,6 +931,7 @@ export class ContentTypeSchemasPageComponent implements OnInit {
       active: true
     };
     await this.loadSchemas();
+    await this.loadSchemaFolderContext();
     const summary = this.findSummary(schema.name, schema.version);
 
     if (summary) {

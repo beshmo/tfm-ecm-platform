@@ -54,3 +54,20 @@ export class FolderNotEmptyError extends FolderApplicationError {
     this.name = "FolderNotEmptyError";
   }
 }
+
+export class ProtectedFolderOperationNotAllowedError extends FolderApplicationError {
+  constructor(operation: "rename" | "move" | "delete") {
+    super(
+      `Protected system folders cannot be ${operation}d.`,
+      "PROTECTED_FOLDER_OPERATION_NOT_ALLOWED"
+    );
+    this.name = "ProtectedFolderOperationNotAllowedError";
+  }
+}
+
+export class FolderSchemaNamespaceError extends FolderApplicationError {
+  constructor(message: string) {
+    super(message, "SCHEMA_NAMESPACE_CONFLICT");
+    this.name = "FolderSchemaNamespaceError";
+  }
+}

@@ -34,7 +34,6 @@ pnpm dev:frontend                 # Angular dev server on :4200, proxies /api to
 pnpm dev:api-gateway               # :3000
 pnpm dev:identity-service          # :3001
 pnpm dev:content-service           # :3002
-pnpm dev:content-type-service      # :3003
 pnpm dev:publication-service       # :3004
 pnpm dev:publication-worker        # :3005
 pnpm dev:delivery-service          # :3006
@@ -54,8 +53,8 @@ docker compose up --build                     # full stack in containers
 ```
 apps/management-frontend/   Angular 20 standalone-component SPA
 services/                   NestJS microservices (api-gateway, identity-service,
-                             content-service, content-type-service,
-                             publication-service, publication-worker, delivery-service)
+                             content-service, publication-service,
+                             publication-worker, delivery-service)
 packages/shared-*           shared-types, shared-events, shared-auth, shared-yaml
 infrastructure/              Docker/K8s/Helm assets
 docs/                        architecture.md + ADRs (docs/adr/NNNN-*.md)
@@ -80,12 +79,13 @@ Angular frontend feature areas (`apps/management-frontend/src/app/features/*`): 
 | Service | Owns |
 | --- | --- |
 | identity-service | Auth, sessions, users, roles (Redis-backed) |
-| content-type-service | Content type YAML schemas + validation rules (MongoDB) |
-| content-service | Content drafts/master records, folder hierarchy, lifecycle state, document metadata (MongoDB + filesystem storage) |
+| content-service | Content drafts/master records, folder hierarchy (including reserved `/system` + `/system/schemas`), lifecycle state, document metadata, content type YAML schemas + validation rules, and folder-contained content type definition objects (MongoDB + filesystem storage) |
 | publication-service | Publication/unpublication requests and state (MongoDB + RabbitMQ) |
 | publication-worker | Consumes RabbitMQ events, projects/removes content between Management and Delivery MongoDB |
 | delivery-service | Read-only published content API (Delivery MongoDB) |
 | api-gateway | Single entry point: routing, auth integration, request forwarding |
+
+Content type schemas used to be owned by a standalone `content-type-service`; it was merged into `content-service` because content type definitions are folder-contained objects under `/system/schemas` and folder occupancy/move/delete needed to stay in one consistency boundary (see [ADR-0017](docs/adr/0017-merge-content-type-service-into-content-service.md)).
 
 Management and Delivery data are separate MongoDB databases (`ecmp_management` / `ecmp_delivery`), even when sharing one MongoDB instance — never share collections between them. Publication is projection-based and asynchronous: publication-service emits `content.publish.requested`/`content.unpublish.requested` events over RabbitMQ only after its own DB transaction commits; publication-worker consumes them, writes to Delivery in its own transaction, then emits `content.published`/`content.unpublished`/`*.failed`. No automatic retries — failures are surfaced for manual retry. Worker logic must be idempotent (upsert by `contentId`, keyed by `contentVersion`).
 
@@ -95,7 +95,9 @@ Management and Delivery data are separate MongoDB databases (`ecmp_management` /
 
 ### Content model
 
-Content types are YAML schemas (`docs/architecture.md` "Content Model") validated against a small fixed set of field types (`string`, `integer`, `date`, `time`). Folder, Document, and Content type are internal platform types that cannot be extended by users; all other content types are user-defined. Global IDs are prefixed (`RCD-`, `FLD-`, `STF-`), UUIDv4-based, generated server-side; the root folder uses the reserved ID `FLD-root`.
+Content types are YAML schemas (`docs/architecture.md` "Content Model") validated against a small fixed set of field types (`string`, `integer`, `date`, `time`). Folder, Document, and Content type definition are internal platform types that cannot be extended by users; all other content types are user-defined. Global IDs are prefixed (`RCD-`, `FLD-`, `STF-`, `CTD-`), UUIDv4-based, generated server-side; the root folder uses the reserved ID `FLD-root`.
+
+Content type definitions are folder-contained repository objects, not a flat registry: each content type name (e.g. `article`) is one definition object (`CTD-` id) grouping all its schema versions, assigned to a folder under the reserved `/system/schemas` namespace (root `FLD-root` → `/system` (`FLD-system`) → `/system/schemas` (`FLD-system-schemas`)). Those two system folders reject rename/move/delete; normal content records and documents cannot be created under them. Admins can create schema subfolders under `/system/schemas` and move definitions between them; a schema folder can't be deleted while it still contains definitions or child folders. Schema administration (browsing definitions by folder, create/replace/deactivate/move) requires the `content-type:*` permission; listing/reading active schemas by name stays open so authoring flows can pick a content type. See `docs/architecture.md` "Content Type Definitions and the Schema Namespace" for full details.
 
 ### Auth model
 

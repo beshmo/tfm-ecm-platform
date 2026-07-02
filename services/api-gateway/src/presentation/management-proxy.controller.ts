@@ -2,8 +2,6 @@ import { All, Body, Controller, Req, Res } from "@nestjs/common";
 import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from "node:http";
 
 const CONTENT_SERVICE_URL = process.env["CONTENT_SERVICE_URL"] ?? "http://localhost:3002";
-const CONTENT_TYPE_SERVICE_URL =
-  process.env["CONTENT_TYPE_SERVICE_URL"] ?? "http://localhost:3003";
 
 @Controller("api/management")
 export class ManagementProxyController {
@@ -57,14 +55,11 @@ export class ManagementProxyController {
 }
 
 function resolveTargetBaseUrl(requestUrl: string): string | null {
-  if (requestUrl.startsWith("/api/management/content-types")) {
-    return CONTENT_TYPE_SERVICE_URL;
-  }
-
   if (
     requestUrl.startsWith("/api/management/folders") ||
     requestUrl.startsWith("/api/management/contents") ||
-    requestUrl.startsWith("/api/management/files")
+    requestUrl.startsWith("/api/management/files") ||
+    requestUrl.startsWith("/api/management/content-types")
   ) {
     return CONTENT_SERVICE_URL;
   }

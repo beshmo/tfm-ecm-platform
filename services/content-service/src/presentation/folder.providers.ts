@@ -21,17 +21,24 @@ import {
   DeleteFolderUseCase,
   GetFolderUseCase,
   ListFoldersUseCase,
+  MoveFolderUseCase,
   RenameFolderUseCase
 } from "../application/folder.use-cases";
+import { createRootFolder } from "../domain/folder";
+import {
+  createSystemFolder,
+  createSystemSchemasFolder
+} from "../domain/system-folder";
 import type { FolderContentReader } from "../domain/folder-content.reader";
 import type { FolderIdGenerator } from "../domain/folder-id-generator";
 import type { FolderRepository } from "../domain/folder.repository";
 import type { StaticFileIdGenerator } from "../domain/static-file-id-generator";
 import type { StaticFileRepository } from "../domain/static-file.repository";
 import type { StaticFileStorage } from "../domain/static-file.storage";
+import type { ContentTypeSchemaRepository } from "../domain/content-type-schema.repository";
 import { CompositeFolderContentReader } from "../infrastructure/composite-folder-content.reader";
 import { FilesystemStaticFileStorage } from "../infrastructure/filesystem-static-file.storage";
-import { HttpContentTypeSchemaReader } from "../infrastructure/http-content-type-schema.reader";
+import { SchemaRepositoryContentTypeSchemaReader } from "../infrastructure/schema-repository-content-type-schema.reader";
 import {
   CryptoContentIdGenerator,
   InMemoryContentRepository
@@ -44,8 +51,9 @@ import {
   CryptoStaticFileIdGenerator,
   InMemoryStaticFileRepository
 } from "../infrastructure/in-memory-static-file.repository";
+import { CONTENT_TYPE_SCHEMA_REPOSITORY, FOLDER_REPOSITORY } from "./di-tokens";
 
-export const FOLDER_REPOSITORY = Symbol("FOLDER_REPOSITORY");
+export { FOLDER_REPOSITORY };
 export const FOLDER_ID_GENERATOR = Symbol("FOLDER_ID_GENERATOR");
 export const FOLDER_CONTENT_READER = Symbol("FOLDER_CONTENT_READER");
 export const CONTENT_REPOSITORY = Symbol("CONTENT_REPOSITORY");
@@ -58,7 +66,12 @@ export const STATIC_FILE_STORAGE = Symbol("STATIC_FILE_STORAGE");
 export const folderProviders = [
   {
     provide: FOLDER_REPOSITORY,
-    useFactory: (): FolderRepository => new InMemoryFolderRepository()
+    useFactory: (): FolderRepository =>
+      new InMemoryFolderRepository([
+        createRootFolder(),
+        createSystemFolder(),
+        createSystemSchemasFolder()
+      ])
   },
   {
     provide: FOLDER_ID_GENERATOR,
@@ -86,16 +99,23 @@ export const folderProviders = [
   },
   {
     provide: CONTENT_TYPE_SCHEMA_READER,
-    useFactory: (): ContentTypeSchemaReader => new HttpContentTypeSchemaReader()
+    useFactory: (repository: ContentTypeSchemaRepository): ContentTypeSchemaReader =>
+      new SchemaRepositoryContentTypeSchemaReader(repository),
+    inject: [CONTENT_TYPE_SCHEMA_REPOSITORY]
   },
   {
     provide: FOLDER_CONTENT_READER,
     useFactory: (
       contentReader: FolderContentReader,
-      staticFileRepository: StaticFileRepository
+      staticFileRepository: StaticFileRepository,
+      schemaRepository: ContentTypeSchemaRepository
     ): FolderContentReader =>
-      new CompositeFolderContentReader(contentReader, staticFileRepository),
-    inject: [CONTENT_REPOSITORY, STATIC_FILE_REPOSITORY]
+      new CompositeFolderContentReader(
+        contentReader,
+        staticFileRepository,
+        schemaRepository
+      ),
+    inject: [CONTENT_REPOSITORY, STATIC_FILE_REPOSITORY, CONTENT_TYPE_SCHEMA_REPOSITORY]
   },
   {
     provide: ListFoldersUseCase,
@@ -121,6 +141,12 @@ export const folderProviders = [
     provide: RenameFolderUseCase,
     useFactory: (repository: FolderRepository): RenameFolderUseCase =>
       new RenameFolderUseCase(repository),
+    inject: [FOLDER_REPOSITORY]
+  },
+  {
+    provide: MoveFolderUseCase,
+    useFactory: (repository: FolderRepository): MoveFolderUseCase =>
+      new MoveFolderUseCase(repository),
     inject: [FOLDER_REPOSITORY]
   },
   {

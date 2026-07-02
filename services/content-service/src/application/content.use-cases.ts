@@ -21,10 +21,12 @@ import {
 import type { ContentRepository } from "../domain/content.repository";
 import type { ContentTypeSchemaReader } from "../domain/content-type-schema.reader";
 import type { FolderRepository } from "../domain/folder.repository";
+import { isSystemNamespacePath } from "../domain/system-folder";
 import { ContentTypeSchemaNotFoundError } from "./content-validation.errors";
 import {
   ContentFolderNotFoundError,
   ContentNotFoundError,
+  ContentSystemNamespaceError,
   InvalidContentDataError
 } from "./content.errors";
 
@@ -171,6 +173,10 @@ async function ensureFolderExists(
 
   if (!folder) {
     throw new ContentFolderNotFoundError(folderId);
+  }
+
+  if (isSystemNamespacePath(folder.path)) {
+    throw new ContentSystemNamespaceError(folderId);
   }
 }
 

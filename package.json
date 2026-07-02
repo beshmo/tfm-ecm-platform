@@ -21,7 +21,6 @@
     "dev:api-gateway": "pnpm --filter @ecmp/api-gateway start:dev",
     "dev:identity-service": "pnpm --filter @ecmp/identity-service start:dev",
     "dev:content-service": "pnpm --filter @ecmp/content-service start:dev",
-    "dev:content-type-service": "pnpm --filter @ecmp/content-type-service start:dev",
     "dev:publication-service": "pnpm --filter @ecmp/publication-service start:dev",
     "dev:publication-worker": "pnpm --filter @ecmp/publication-worker start:dev",
     "dev:delivery-service": "pnpm --filter @ecmp/delivery-service start:dev"

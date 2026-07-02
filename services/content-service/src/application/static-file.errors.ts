@@ -48,3 +48,10 @@ export class StaticFileStorageError extends Error {
     this.name = "StaticFileStorageError";
   }
 }
+
+export class StaticFileSystemNamespaceError extends Error {
+  constructor(folderId: FolderId) {
+    super(`Documents cannot be uploaded to the system namespace folder '${folderId}'.`);
+    this.name = "StaticFileSystemNamespaceError";
+  }
+}
