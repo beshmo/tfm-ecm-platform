@@ -14,7 +14,8 @@
     "pretest": "pnpm --filter @ecmp/shared-types --filter @ecmp/shared-yaml build",
     "test": "vitest run",
     "pretest:unit": "pnpm --filter @ecmp/shared-types --filter @ecmp/shared-yaml build",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@ecmp/shared-types": "workspace:*",

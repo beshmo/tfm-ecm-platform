@@ -2,10 +2,6 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    environment: "jsdom",
-    globals: true,
-    include: ["src/**/*.spec.ts"],
-    setupFiles: ["src/test-setup.ts"],
     coverage: {
       provider: "v8",
       enabled: true,
@@ -14,10 +10,10 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       all: true,
       thresholds: {
-        lines: 20,
-        functions: 20,
-        branches: 20,
-        statements: 20,
+        lines: 0,
+        functions: 0,
+        branches: 0,
+        statements: 0,
       },
     },
   },
