@@ -4,8 +4,10 @@ import { provideRouter, Router, RouterOutlet, withComponentInputBinding } from "
 import {
   INITIAL_GENERIC_CONTENT_TYPE_SCHEMA,
   ROOT_FOLDER_ID,
+  type ContentTypeDefinition,
   type ContentRecord,
   type Folder,
+  type FolderId,
   type StaticFile
 } from "@ecmp/shared-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -41,6 +43,11 @@ describe("management frontend route integration", () => {
     createSchema: ReturnType<typeof vi.fn>;
     replaceSchemaVersion: ReturnType<typeof vi.fn>;
     deactivateSchemaVersion: ReturnType<typeof vi.fn>;
+    getSchemaFolder: ReturnType<typeof vi.fn>;
+    listSchemaSubfolders: ReturnType<typeof vi.fn>;
+    createSchemaFolder: ReturnType<typeof vi.fn>;
+    listContentTypeDefinitions: ReturnType<typeof vi.fn>;
+    moveContentTypeDefinition: ReturnType<typeof vi.fn>;
   };
   let staticFileApi: {
     listFiles: ReturnType<typeof vi.fn>;
@@ -70,7 +77,16 @@ describe("management frontend route integration", () => {
       getSchemaVersion: vi.fn().mockResolvedValue(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA),
       createSchema: vi.fn(),
       replaceSchemaVersion: vi.fn(),
-      deactivateSchemaVersion: vi.fn()
+      deactivateSchemaVersion: vi.fn(),
+      getSchemaFolder: vi
+        .fn()
+        .mockResolvedValue(schemaFolder("FLD-system-schemas", "schemas", "/system/schemas", "FLD-system")),
+      listSchemaSubfolders: vi.fn().mockResolvedValue([]),
+      createSchemaFolder: vi.fn(),
+      listContentTypeDefinitions: vi
+        .fn()
+        .mockResolvedValue([schemaDefinition("generic", "FLD-system-schemas")]),
+      moveContentTypeDefinition: vi.fn()
     };
     staticFileApi = {
       listFiles: vi.fn((folderId: string) =>
@@ -118,9 +134,8 @@ describe("management frontend route integration", () => {
 
     expect(pageText(fixture)).toContain("Content Type Schemas");
     expect(pageText(fixture)).toContain("generic");
-    expect(pageText(fixture)).toContain("title");
-    expect(contentTypeApi.listSchemas).toHaveBeenCalled();
-    expect(contentTypeApi.getSchemaVersion).toHaveBeenCalledWith("generic", "1.0");
+    expect(contentTypeApi.getSchemaFolder).toHaveBeenCalled();
+    expect(contentTypeApi.listContentTypeDefinitions).toHaveBeenCalled();
   });
 
   async function navigateTo(path: string): Promise<ComponentFixture<RouteHostComponent>> {
@@ -168,6 +183,34 @@ function content(contentId: ContentRecord["contentId"], folderId: ContentRecord[
     version: 1,
     status: "draft",
     data: {},
+    createdAt: "2026-06-29T10:00:00.000Z",
+    updatedAt: "2026-06-29T10:00:00.000Z"
+  };
+}
+
+function schemaFolder(
+  folderId: FolderId,
+  name: string,
+  path: string,
+  parentFolderId: string
+): Folder {
+  return {
+    folderId: folderId as Folder["folderId"],
+    name,
+    parentFolderId: parentFolderId as Folder["parentFolderId"],
+    path,
+    createdAt: "2026-06-29T10:00:00.000Z",
+    updatedAt: "2026-06-29T10:00:00.000Z"
+  };
+}
+
+function schemaDefinition(name: string, folderId: string): ContentTypeDefinition {
+  return {
+    contentTypeDefinitionId: `CTD-${name}` as ContentTypeDefinition["contentTypeDefinitionId"],
+    objectTypeId: "ecmp:content-type-definition",
+    folderId: folderId as ContentTypeDefinition["folderId"],
+    name,
+    versions: [{ name, version: "1.0", active: true }],
     createdAt: "2026-06-29T10:00:00.000Z",
     updatedAt: "2026-06-29T10:00:00.000Z"
   };

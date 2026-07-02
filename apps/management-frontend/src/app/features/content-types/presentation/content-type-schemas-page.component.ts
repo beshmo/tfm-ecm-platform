@@ -1,13 +1,10 @@
 import { CommonModule } from "@angular/common";
-import { Component, Inject, OnInit } from "@angular/core";
+import { Component, Inject, OnInit, ViewChild } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import type {
-  ContentFieldType,
   ContentTypeDefinition,
-  ContentTypeName,
   ContentTypeSchemaDefinition,
   ContentTypeSchemaSummary,
-  ContentTypeVersion,
   Folder,
   FolderId
 } from "@ecmp/shared-types";
@@ -15,185 +12,114 @@ import { SYSTEM_SCHEMAS_FOLDER_ID } from "@ecmp/shared-types";
 
 import type { ApiClientError } from "../../../shared/infrastructure/api-client-error";
 import { ContentTypeApiClient } from "../infrastructure/content-type-api.client";
-
-interface SchemaFieldDraft {
-  name: string;
-  type: ContentFieldType;
-  required: boolean;
-}
-
-interface SchemaDraft {
-  name: string;
-  version: string;
-  fields: SchemaFieldDraft[];
-}
-
-const FIELD_TYPES: readonly ContentFieldType[] = [
-  "string",
-  "integer",
-  "date",
-  "time",
-  "boolean",
-  "datetime",
-  "decimal",
-  "html",
-  "uri"
-];
+import { SchemaFolderTreeComponent } from "./schema-folder-tree.component";
+import { SchemaEditorModalComponent } from "./schema-editor-modal.component";
+import { FolderPickerModalComponent } from "./folder-picker-modal.component";
 
 @Component({
   selector: "ecmp-content-type-schemas-page",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    SchemaFolderTreeComponent,
+    SchemaEditorModalComponent,
+    FolderPickerModalComponent
+  ],
   template: `
     <main class="shell">
       <header class="toolbar">
         <div>
           <h1>Content Type Schemas</h1>
-          <p>{{ schemas.length }} active versions</p>
+          <p *ngIf="definitionList.length > 0">{{ definitionList.length }} definitions</p>
         </div>
-        <button type="button" class="secondary" (click)="loadSchemas()" [disabled]="loading">
+        <button type="button" class="secondary" (click)="loadRootContext()" [disabled]="loading">
           Refresh
         </button>
       </header>
 
-      <section class="schema-folders" aria-label="Schema folder browser">
-        <div class="content-header">
-          <h2>Schema Folders</h2>
-          <button type="button" class="secondary" (click)="loadSchemaFolderContext()" [disabled]="folderLoading">
-            Refresh folders
-          </button>
+      <div class="layout">
+        <div class="tree-panel">
+          <div class="tree-header">
+            <h2>Folders</h2>
+            <button type="button" class="secondary" (click)="onNewFolder()" title="New folder">
+              +
+            </button>
+          </div>
+          <ecmp-schema-folder-tree
+            *ngIf="rootFolder"
+            [folders]="[rootFolder]"
+            [selectedFolderId]="selectedFolderId"
+            (selectFolder)="onSelectFolder($event)"
+          />
+          <p *ngIf="!rootFolder && !loading" class="empty">Loading folders...</p>
         </div>
 
-        <nav aria-label="Schema folder breadcrumb" class="breadcrumb">
-          <button
-            *ngFor="let crumb of schemaFolderCrumbs; let i = index; trackBy: trackFolderById"
-            type="button"
-            class="secondary crumb"
-            [disabled]="i === schemaFolderCrumbs.length - 1"
-            (click)="goToSchemaCrumb(i)"
-          >
-            {{ crumb.name }}
-          </button>
-        </nav>
-
-        <p *ngIf="folderLoading" class="empty">Loading schema folders...</p>
-        <p *ngIf="folderErrorMessage" class="error">{{ folderErrorMessage }}</p>
-
-        <div class="folder-grid">
-          <div aria-label="Schema subfolders">
-            <h3>Subfolders</h3>
-            <p *ngIf="schemaSubfolders.length === 0 && !folderLoading" class="empty">
-              No schema subfolders.
-            </p>
-            <button
-              *ngFor="let folder of schemaSubfolders; trackBy: trackFolderById"
-              type="button"
-              class="schema-button"
-              [attr.aria-label]="'Open ' + folder.name"
-              (click)="enterSchemaFolder(folder)"
-            >
-              <strong>{{ folder.name }}</strong>
-              <span>{{ folder.path }}</span>
-            </button>
-
-            <form (ngSubmit)="createSchemaFolder()" aria-label="Create schema folder">
-              <label>
-                New folder
-                <input name="newSchemaFolderName" [(ngModel)]="newSchemaFolderName" />
-              </label>
-              <p *ngIf="createFolderErrorMessage" class="error">{{ createFolderErrorMessage }}</p>
-              <button type="submit" [disabled]="folderSaving">Create folder</button>
-            </form>
-          </div>
-
-          <div aria-label="Content type definitions">
-            <h3>Content Type Definitions</h3>
-            <p *ngIf="definitions.length === 0 && !folderLoading" class="empty">
-              No content type definitions in this folder.
-            </p>
-            <p *ngIf="moveErrorMessage" class="error">{{ moveErrorMessage }}</p>
-            <div
-              class="definition-row"
-              *ngFor="let definition of definitions; trackBy: trackDefinitionById"
-            >
-              <strong>{{ definition.name }}</strong>
-              <span>{{ definition.versions.length }} versions</span>
-              <select
-                [attr.data-name]="'moveTarget-' + definition.name"
-                [name]="'moveTarget-' + definition.name"
-                [ngModel]="moveTargetFolderId"
-                (ngModelChange)="moveTargetFolderId = $event"
-                aria-label="Move target folder"
-              >
-                <option value="">Choose folder...</option>
-                <option
-                  *ngFor="let folder of moveCandidateFolders; trackBy: trackFolderById"
-                  [value]="folder.folderId"
-                >
-                  {{ folder.path }}
-                </option>
-              </select>
+        <div class="content-panel">
+          <div class="content-toolbar">
+            <span class="folder-label">{{ currentFolderLabel }}</span>
+            <div class="actions">
               <button
                 type="button"
-                class="secondary"
-                [attr.aria-label]="'Move ' + definition.name"
-                (click)="moveDefinition(definition)"
-                [disabled]="folderSaving || !moveTargetFolderId"
+                (click)="onNew()"
+                [disabled]="!selectedFolderId"
+              >
+                New
+              </button>
+              <button
+                type="button"
+                (click)="onEdit()"
+                [disabled]="!selectedDefinition || !selectedSchema"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                (click)="onMove()"
+                [disabled]="!selectedDefinition"
               >
                 Move
               </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="workspace" aria-label="Content type schema administration">
-        <aside aria-label="Content type schemas">
-          <h2>Schemas</h2>
-          <p *ngIf="loading && schemas.length === 0">Loading schemas...</p>
-          <p *ngIf="pageErrorMessage" class="error">{{ pageErrorMessage }}</p>
-          <p *ngIf="!loading && !pageErrorMessage && schemas.length === 0" class="empty">
-            No active schema versions.
-          </p>
-          <button
-            *ngFor="let schema of schemas"
-            type="button"
-            class="schema-button"
-            [class.active]="isSelected(schema)"
-            (click)="selectSchema(schema)"
-          >
-            <strong>{{ schema.name }}</strong>
-            <span>{{ schema.version }}</span>
-          </button>
-        </aside>
-
-        <article>
-          <section aria-label="Selected schema details">
-            <div class="content-header">
-              <h2>Details</h2>
               <button
                 type="button"
-                class="secondary"
-                (click)="confirmDeactivate()"
-                [disabled]="!selectedSummary || saving"
+                class="danger"
+                (click)="onDeactivate()"
+                [disabled]="!selectedDefinition"
               >
                 Deactivate
               </button>
             </div>
+          </div>
 
-            <p *ngIf="detailLoading">Loading schema...</p>
-            <p *ngIf="detailErrorMessage" class="error">{{ detailErrorMessage }}</p>
+          <p *ngIf="loading" class="empty">Loading definitions...</p>
+          <p *ngIf="errorMessage" class="error">{{ errorMessage }}</p>
 
-            <div *ngIf="selectedSchema" class="details-grid">
+          <div class="schema-list" *ngIf="!loading">
+            <p *ngIf="definitionList.length === 0" class="empty">No definitions in this folder.</p>
+            <button
+              *ngFor="let definition of definitionList; trackBy: trackDefinitionById"
+              type="button"
+              class="schema-button"
+              [class.active]="selectedDefinition?.contentTypeDefinitionId === definition.contentTypeDefinitionId"
+              (click)="selectDefinition(definition)"
+            >
+              <strong>{{ definition.name }}</strong>
+              <span>{{ latestActiveVersion(definition) }}</span>
+            </button>
+          </div>
+
+          <div *ngIf="selectedSchema" class="detail-panel">
+            <h3>Details</h3>
+            <div class="details-grid">
               <span>Name</span>
               <strong>{{ selectedSchema.name }}</strong>
               <span>Version</span>
               <strong>{{ selectedSchema.version }}</strong>
               <span>Active</span>
-              <strong>{{ selectedSummary?.active ? "Yes" : "No" }}</strong>
+              <strong>{{ activeVersionLabel }}</strong>
             </div>
 
-            <table *ngIf="selectedSchema && selectedSchema.fields.length > 0">
+            <table *ngIf="selectedSchema.fields.length > 0">
               <thead>
                 <tr>
                   <th>Field</th>
@@ -209,173 +135,27 @@ const FIELD_TYPES: readonly ContentFieldType[] = [
                 </tr>
               </tbody>
             </table>
-          </section>
+          </div>
+        </div>
+      </div>
 
-          <section class="forms-grid" aria-label="Schema forms">
-            <form (ngSubmit)="createSchema()" aria-label="Create schema">
-              <h2>Create</h2>
-              <label>
-                Name
-                <input name="createSchemaName" [(ngModel)]="createDraft.name" />
-              </label>
-              <label>
-                Version
-                <input name="createSchemaVersion" [(ngModel)]="createDraft.version" />
-              </label>
+      <ecmp-schema-editor-modal
+        *ngIf="editorOpen"
+        [mode]="editorMode"
+        [schema]="editSchema"
+        (saved)="onEditorSaved($event)"
+        (closed)="onEditorClosed()"
+      />
 
-              <div class="fields-editor" aria-label="Create schema fields">
-                <div
-                  class="field-row"
-                  *ngFor="let field of createDraft.fields; let i = index; trackBy: trackFieldByIndex"
-                >
-                  <input
-                    [name]="'createFieldName-' + i"
-                    [attr.data-name]="'createFieldName-' + i"
-                    [(ngModel)]="field.name"
-                    placeholder="Field name"
-                    aria-label="Field name"
-                  />
-                  <select
-                    [name]="'createFieldType-' + i"
-                    [attr.data-name]="'createFieldType-' + i"
-                    [(ngModel)]="field.type"
-                    aria-label="Field type"
-                  >
-                    <option *ngFor="let type of fieldTypes" [value]="type">{{ type }}</option>
-                  </select>
-                  <label class="required-toggle">
-                    <input
-                      type="checkbox"
-                      [name]="'createFieldRequired-' + i"
-                      [attr.data-name]="'createFieldRequired-' + i"
-                      [(ngModel)]="field.required"
-                    />
-                    Required
-                  </label>
-                  <button
-                    type="button"
-                    class="secondary"
-                    (click)="moveCreateField(i, -1)"
-                    [disabled]="i === 0"
-                    aria-label="Move field up"
-                  >
-                    Up
-                  </button>
-                  <button
-                    type="button"
-                    class="secondary"
-                    (click)="moveCreateField(i, 1)"
-                    [disabled]="i === createDraft.fields.length - 1"
-                    aria-label="Move field down"
-                  >
-                    Down
-                  </button>
-                  <button
-                    type="button"
-                    class="secondary"
-                    (click)="removeCreateField(i)"
-                    aria-label="Remove field"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-
-              <button type="button" class="secondary" (click)="addCreateField()">Add field</button>
-
-              <p *ngIf="createErrorMessage" class="error">{{ createErrorMessage }}</p>
-              <ul *ngIf="createValidationMessages.length > 0" class="error-list">
-                <li *ngFor="let message of createValidationMessages">{{ message }}</li>
-              </ul>
-              <button type="submit" [disabled]="saving">Create schema</button>
-            </form>
-
-            <form (ngSubmit)="replaceSchema()" aria-label="Replace schema">
-              <h2>Replace Selected</h2>
-              <p *ngIf="!replaceDraft" class="empty">Select a schema to replace.</p>
-
-              <ng-container *ngIf="replaceDraft as draft">
-                <label>
-                  Name
-                  <input name="replaceSchemaName" [ngModel]="draft.name" disabled />
-                </label>
-                <label>
-                  Version
-                  <input name="replaceSchemaVersion" [ngModel]="draft.version" disabled />
-                </label>
-
-                <div class="fields-editor" aria-label="Replace schema fields">
-                  <div
-                    class="field-row"
-                    *ngFor="let field of draft.fields; let i = index; trackBy: trackFieldByIndex"
-                  >
-                    <input
-                      [name]="'replaceFieldName-' + i"
-                      [attr.data-name]="'replaceFieldName-' + i"
-                      [(ngModel)]="field.name"
-                      placeholder="Field name"
-                      aria-label="Field name"
-                    />
-                    <select
-                      [name]="'replaceFieldType-' + i"
-                      [attr.data-name]="'replaceFieldType-' + i"
-                      [(ngModel)]="field.type"
-                      aria-label="Field type"
-                    >
-                      <option *ngFor="let type of fieldTypes" [value]="type">{{ type }}</option>
-                    </select>
-                    <label class="required-toggle">
-                      <input
-                        type="checkbox"
-                        [name]="'replaceFieldRequired-' + i"
-                        [attr.data-name]="'replaceFieldRequired-' + i"
-                        [(ngModel)]="field.required"
-                      />
-                      Required
-                    </label>
-                    <button
-                      type="button"
-                      class="secondary"
-                      (click)="moveReplaceField(i, -1)"
-                      [disabled]="i === 0"
-                      aria-label="Move field up"
-                    >
-                      Up
-                    </button>
-                    <button
-                      type="button"
-                      class="secondary"
-                      (click)="moveReplaceField(i, 1)"
-                      [disabled]="i === draft.fields.length - 1"
-                      aria-label="Move field down"
-                    >
-                      Down
-                    </button>
-                    <button
-                      type="button"
-                      class="secondary"
-                      (click)="removeReplaceField(i)"
-                      aria-label="Remove field"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-
-                <button type="button" class="secondary" (click)="addReplaceField()">
-                  Add field
-                </button>
-              </ng-container>
-
-              <p *ngIf="replaceErrorMessage" class="error">{{ replaceErrorMessage }}</p>
-              <ul *ngIf="replaceValidationMessages.length > 0" class="error-list">
-                <li *ngFor="let message of replaceValidationMessages">{{ message }}</li>
-              </ul>
-              <button type="submit" [disabled]="saving || !replaceDraft">Replace schema</button>
-            </form>
-          </section>
-        </article>
-      </section>
+      <ecmp-folder-picker-modal
+        *ngIf="pickerOpen"
+        [mode]="pickerMode"
+        [folders]="pickerFolders"
+        [title]="pickerTitle"
+        (selected)="onPickerSelected($event)"
+        (folderCreated)="onPickerFolderCreated($event)"
+        (closed)="onPickerClosed()"
+      />
     </main>
   `,
   styles: [
@@ -398,6 +178,7 @@ const FIELD_TYPES: readonly ContentFieldType[] = [
 
       h1,
       h2,
+      h3,
       p {
         margin: 0;
       }
@@ -424,23 +205,76 @@ const FIELD_TYPES: readonly ContentFieldType[] = [
         background: #5d6773;
       }
 
-      .workspace {
+      button.danger {
+        background: #a33131;
+      }
+
+      .layout {
         display: grid;
-        gap: 1rem;
-        grid-template-columns: minmax(13rem, 19rem) 1fr;
+        gap: 0;
+        grid-template-columns: minmax(14rem, 20rem) 1fr;
         padding: 1rem;
       }
 
-      aside,
-      article {
+      .tree-panel {
         background: #ffffff;
         border: 1px solid #d7dde3;
+        min-width: 0;
+        padding: 0.75rem;
+      }
+
+      .tree-header {
+        align-items: center;
+        display: flex;
+        gap: 0.5rem;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #d7dde3;
+      }
+
+      .tree-header h2 {
+        font-size: 1rem;
+      }
+
+      .tree-header button {
+        font-size: 1rem;
+        line-height: 1;
+        padding: 0.25rem 0.5rem;
+      }
+
+      .content-panel {
+        background: #ffffff;
+        border: 1px solid #d7dde3;
+        border-left: 0;
         min-width: 0;
         padding: 1rem;
       }
 
-      aside {
-        align-self: start;
+      .content-toolbar {
+        align-items: center;
+        display: flex;
+        gap: 0.75rem;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid #d7dde3;
+      }
+
+      .folder-label {
+        color: #52606d;
+        font-weight: 600;
+      }
+
+      .actions {
+        display: flex;
+        gap: 0.375rem;
+      }
+
+      .schema-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
       }
 
       .schema-button {
@@ -448,8 +282,7 @@ const FIELD_TYPES: readonly ContentFieldType[] = [
         background: transparent;
         color: #18212b;
         display: grid;
-        gap: 0.25rem;
-        margin-top: 0.5rem;
+        gap: 0.125rem;
         overflow-wrap: anywhere;
         text-align: left;
         width: 100%;
@@ -457,6 +290,7 @@ const FIELD_TYPES: readonly ContentFieldType[] = [
 
       .schema-button span {
         color: #52606d;
+        font-size: 0.875rem;
       }
 
       .schema-button.active {
@@ -464,18 +298,21 @@ const FIELD_TYPES: readonly ContentFieldType[] = [
         color: #124b7c;
       }
 
-      .content-header {
-        align-items: center;
-        display: flex;
-        gap: 0.5rem;
-        justify-content: space-between;
+      .detail-panel {
+        border-top: 1px solid #d7dde3;
+        margin-top: 1rem;
+        padding-top: 1rem;
+      }
+
+      .detail-panel h3 {
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
       }
 
       .details-grid {
         display: grid;
         gap: 0.5rem 1rem;
         grid-template-columns: max-content 1fr;
-        margin-top: 1rem;
       }
 
       .details-grid span {
@@ -484,156 +321,61 @@ const FIELD_TYPES: readonly ContentFieldType[] = [
 
       table {
         border-collapse: collapse;
-        margin-top: 1rem;
+        margin-top: 0.75rem;
         width: 100%;
       }
 
       th,
       td {
         border-bottom: 1px solid #d7dde3;
-        padding: 0.625rem;
+        padding: 0.5rem;
         text-align: left;
         vertical-align: top;
       }
 
-      .forms-grid {
-        display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        margin-top: 1.5rem;
-      }
-
-      form {
-        display: grid;
-        gap: 0.75rem;
-        min-width: 0;
-      }
-
-      form label {
-        display: grid;
-        gap: 0.25rem;
-      }
-
-      input,
-      select {
-        border: 1px solid #b8c2cc;
-        padding: 0.5rem;
-      }
-
-      .fields-editor {
-        display: grid;
-        gap: 0.5rem;
-      }
-
-      .field-row {
-        align-items: center;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-      }
-
-      .field-row input[type="text"],
-      .field-row > input {
-        flex: 1 1 8rem;
-        min-width: 0;
-      }
-
-      .required-toggle {
-        align-items: center;
-        display: flex;
-        gap: 0.25rem;
-        white-space: nowrap;
-      }
-
-      .schema-folders {
-        background: #ffffff;
-        border: 1px solid #d7dde3;
-        margin: 1rem 1rem 0;
-        padding: 1rem;
-      }
-
-      .breadcrumb {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.25rem;
-        margin-top: 0.5rem;
-      }
-
-      .crumb:disabled {
-        background: #124b7c;
-        opacity: 1;
-      }
-
-      .folder-grid {
-        display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        margin-top: 1rem;
-      }
-
-      .definition-row {
-        align-items: center;
-        border-bottom: 1px solid #d7dde3;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
+      .empty {
+        color: #52606d;
         padding: 0.5rem 0;
       }
 
-      .empty {
-        color: #52606d;
-        margin-top: 1rem;
-      }
-
-      .error,
-      .error-list {
+      .error {
         color: #a33131;
-        margin-top: 0.75rem;
         overflow-wrap: anywhere;
       }
 
       @media (max-width: 860px) {
-        .toolbar,
-        .workspace,
-        .forms-grid {
+        .layout {
           display: block;
         }
-
-        article,
-        form + form {
-          margin-top: 1rem;
+        .content-panel {
+          border-left: 1px solid #d7dde3;
+          border-top: 0;
         }
       }
     `
   ]
 })
 export class ContentTypeSchemasPageComponent implements OnInit {
-  schemas: ContentTypeSchemaSummary[] = [];
-  selectedSummary: ContentTypeSchemaSummary | null = null;
+  rootFolder: Folder | null = null;
+  selectedFolderId: FolderId = SYSTEM_SCHEMAS_FOLDER_ID;
+  selectedFolderName = "Schemas";
+  definitionList: ContentTypeDefinition[] = [];
+  selectedDefinition: ContentTypeDefinition | null = null;
   selectedSchema: ContentTypeSchemaDefinition | null = null;
-  readonly fieldTypes = FIELD_TYPES;
-  createDraft: SchemaDraft = defaultCreateDraft();
-  replaceDraft: SchemaDraft | null = null;
   loading = false;
-  detailLoading = false;
-  saving = false;
-  pageErrorMessage = "";
-  detailErrorMessage = "";
-  createErrorMessage = "";
-  createValidationMessages: string[] = [];
-  replaceErrorMessage = "";
-  replaceValidationMessages: string[] = [];
-  schemaFolderCrumbs: Folder[] = [];
-  schemaSubfolders: Folder[] = [];
-  definitions: ContentTypeDefinition[] = [];
-  moveCandidateFolders: Folder[] = [];
-  folderLoading = false;
-  folderSaving = false;
-  folderErrorMessage = "";
-  createFolderErrorMessage = "";
-  moveErrorMessage = "";
-  newSchemaFolderName = "";
-  moveTargetFolderId: FolderId | "" = "";
+  errorMessage = "";
+
+  editorOpen = false;
+  editorMode: "create" | "edit" = "create";
+  editSchema: ContentTypeSchemaDefinition | null = null;
+
+  pickerOpen = false;
+  pickerMode: "move" | "create-folder" = "move";
+  pickerFolders: Folder[] = [];
+  pickerTitle = "";
+
+  @ViewChild(SchemaFolderTreeComponent)
+  private treeComponent!: SchemaFolderTreeComponent;
 
   constructor(
     @Inject(ContentTypeApiClient)
@@ -641,247 +383,196 @@ export class ContentTypeSchemasPageComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    void this.loadSchemas();
-    void this.loadSchemaFolderContext();
+    void this.loadRootContext();
   }
 
-  async loadSchemaFolderContext(): Promise<void> {
-    this.folderLoading = true;
-    this.folderErrorMessage = "";
+  get currentFolderLabel(): string {
+    return this.selectedFolderName;
+  }
 
-    try {
-      if (this.schemaFolderCrumbs.length === 0) {
-        const root = await this.contentTypeApi.getSchemaFolder(SYSTEM_SCHEMAS_FOLDER_ID);
-        this.schemaFolderCrumbs = [root];
-      }
-
-      const currentId = this.currentSchemaFolderId();
-      const [subfolders, definitions] = await Promise.all([
-        this.contentTypeApi.listSchemaSubfolders(currentId),
-        this.contentTypeApi.listContentTypeDefinitions(currentId)
-      ]);
-
-      this.schemaSubfolders = subfolders;
-      this.definitions = definitions;
-      this.recomputeMoveCandidates();
-    } catch (error) {
-      this.folderErrorMessage = (error as Partial<ApiClientError>).message ?? "Request failed.";
-    } finally {
-      this.folderLoading = false;
+  get activeVersionLabel(): string {
+    if (!this.selectedDefinition || !this.selectedSchema) {
+      return "";
     }
+    const version = this.selectedDefinition.versions.find((v) => v.active);
+    return version ? "Yes" : "No";
   }
 
-  async enterSchemaFolder(folder: Folder): Promise<void> {
-    this.schemaFolderCrumbs = [...this.schemaFolderCrumbs, folder];
-    this.moveTargetFolderId = "";
-    await this.loadSchemaFolderContext();
+  latestActiveVersion(definition: ContentTypeDefinition): string {
+    const active = definition.versions.find((v) => v.active);
+    return active ? active.version : "inactive";
   }
 
-  async goToSchemaCrumb(index: number): Promise<void> {
-    this.schemaFolderCrumbs = this.schemaFolderCrumbs.slice(0, index + 1);
-    this.moveTargetFolderId = "";
-    await this.loadSchemaFolderContext();
-  }
-
-  async createSchemaFolder(): Promise<void> {
-    const name = this.newSchemaFolderName.trim();
-
-    if (name.length === 0) {
-      return;
-    }
-
-    this.folderSaving = true;
-    this.createFolderErrorMessage = "";
-
-    try {
-      await this.contentTypeApi.createSchemaFolder(name, this.currentSchemaFolderId());
-      this.newSchemaFolderName = "";
-      await this.loadSchemaFolderContext();
-    } catch (error) {
-      this.createFolderErrorMessage =
-        (error as Partial<ApiClientError>).message ?? "Request failed.";
-    } finally {
-      this.folderSaving = false;
-    }
-  }
-
-  async moveDefinition(definition: ContentTypeDefinition): Promise<void> {
-    if (!this.moveTargetFolderId) {
-      return;
-    }
-
-    this.folderSaving = true;
-    this.moveErrorMessage = "";
-
-    try {
-      await this.contentTypeApi.moveContentTypeDefinition(
-        definition.name,
-        this.moveTargetFolderId
-      );
-      this.moveTargetFolderId = "";
-      await this.loadSchemaFolderContext();
-    } catch (error) {
-      this.moveErrorMessage = (error as Partial<ApiClientError>).message ?? "Request failed.";
-    } finally {
-      this.folderSaving = false;
-    }
-  }
-
-  trackFolderById(_index: number, folder: Folder): string {
-    return folder.folderId;
-  }
-
-  trackDefinitionById(_index: number, definition: ContentTypeDefinition): string {
-    return definition.contentTypeDefinitionId;
-  }
-
-  private currentSchemaFolderId(): FolderId {
-    const current = this.schemaFolderCrumbs[this.schemaFolderCrumbs.length - 1];
-
-    return current ? current.folderId : SYSTEM_SCHEMAS_FOLDER_ID;
-  }
-
-  private recomputeMoveCandidates(): void {
-    const byId = new Map<FolderId, Folder>();
-
-    for (const folder of [...this.schemaFolderCrumbs, ...this.schemaSubfolders]) {
-      byId.set(folder.folderId, folder);
-    }
-
-    this.moveCandidateFolders = Array.from(byId.values());
-  }
-
-  async loadSchemas(): Promise<void> {
+  async loadRootContext(): Promise<void> {
     this.loading = true;
-    this.pageErrorMessage = "";
+    this.errorMessage = "";
 
     try {
-      this.schemas = await this.contentTypeApi.listSchemas();
-      const selected = this.findSummary(
-        this.selectedSchema?.name,
-        this.selectedSchema?.version
-      );
-      const nextSummary = selected ?? this.schemas[0] ?? null;
-
-      if (nextSummary) {
-        await this.selectSchema(nextSummary);
-      } else {
-        this.selectedSummary = null;
-        this.selectedSchema = null;
-        this.replaceDraft = null;
-      }
+      const root = await this.contentTypeApi.getSchemaFolder(SYSTEM_SCHEMAS_FOLDER_ID);
+      this.rootFolder = root;
+      this.selectedFolderId = root.folderId;
+      this.selectedFolderName = root.name;
+      await this.loadFolderDefinitions(root.folderId);
     } catch (error) {
-      this.applyPageError(error);
+      this.errorMessage = (error as Partial<ApiClientError>).message ?? "Request failed.";
     } finally {
       this.loading = false;
     }
   }
 
-  async selectSchema(summary: ContentTypeSchemaSummary): Promise<void> {
-    this.selectedSummary = summary;
-    this.detailLoading = true;
-    this.detailErrorMessage = "";
-    this.clearReplaceErrors();
+  async loadFolderDefinitions(folderId: FolderId): Promise<void> {
+    this.loading = true;
+    this.errorMessage = "";
 
     try {
-      this.selectedSchema = await this.contentTypeApi.getSchemaVersion(
-        summary.name,
-        summary.version
-      );
-      this.replaceDraft = draftFromSchema(this.selectedSchema);
+      const definitions = await this.contentTypeApi.listContentTypeDefinitions(folderId);
+      this.definitionList = definitions;
     } catch (error) {
-      this.selectedSchema = null;
-      this.replaceDraft = null;
-      this.applyDetailError(error);
+      this.definitionList = [];
+      this.errorMessage = (error as Partial<ApiClientError>).message ?? "Request failed.";
     } finally {
-      this.detailLoading = false;
+      this.loading = false;
     }
   }
 
-  addCreateField(): void {
-    this.createDraft.fields.push(emptyFieldDraft());
+  onSelectFolder(folder: Folder): void {
+    this.selectedFolderId = folder.folderId;
+    this.selectedFolderName = folder.name;
+    this.selectedDefinition = null;
+    this.selectedSchema = null;
+    void this.loadFolderDefinitions(folder.folderId);
   }
 
-  removeCreateField(index: number): void {
-    this.createDraft.fields.splice(index, 1);
-  }
+  async selectDefinition(definition: ContentTypeDefinition): Promise<void> {
+    this.selectedDefinition = definition;
+    this.selectedSchema = null;
 
-  moveCreateField(index: number, direction: -1 | 1): void {
-    moveField(this.createDraft.fields, index, direction);
-  }
-
-  addReplaceField(): void {
-    this.replaceDraft?.fields.push(emptyFieldDraft());
-  }
-
-  removeReplaceField(index: number): void {
-    this.replaceDraft?.fields.splice(index, 1);
-  }
-
-  moveReplaceField(index: number, direction: -1 | 1): void {
-    if (this.replaceDraft) {
-      moveField(this.replaceDraft.fields, index, direction);
-    }
-  }
-
-  async createSchema(): Promise<void> {
-    this.saving = true;
-    this.clearCreateErrors();
-
-    try {
-      const created = await this.contentTypeApi.createSchema(
-        draftToYaml(this.createDraft),
-        this.currentSchemaFolderId()
-      );
-      await this.refreshAfterWrite(created);
-    } catch (error) {
-      this.applyCreateError(error);
-    } finally {
-      this.saving = false;
-    }
-  }
-
-  async replaceSchema(): Promise<void> {
-    if (!this.selectedSchema || !this.replaceDraft) {
+    const active = definition.versions.find((v) => v.active);
+    if (!active) {
       return;
     }
 
-    this.saving = true;
-    this.clearReplaceErrors();
-
     try {
-      const replaced = await this.contentTypeApi.replaceSchemaVersion(
-        this.selectedSchema.name,
-        this.selectedSchema.version,
-        draftToYaml(this.replaceDraft)
+      this.selectedSchema = await this.contentTypeApi.getSchemaVersion(
+        definition.name,
+        active.version
       );
-      await this.refreshAfterWrite(replaced);
     } catch (error) {
-      const apiError = error as Partial<ApiClientError>;
-      const message = apiError.message ?? "Request failed.";
-      const validationMessages = apiError.validationMessages ?? [];
-
-      this.applyReplaceError(error);
-
-      if (apiError.status === 404) {
-        await this.loadSchemas();
-        this.replaceErrorMessage = message;
-        this.replaceValidationMessages = validationMessages;
-      }
-    } finally {
-      this.saving = false;
+      this.errorMessage = (error as Partial<ApiClientError>).message ?? "Request failed.";
     }
   }
 
-  async confirmDeactivate(): Promise<void> {
-    if (!this.selectedSummary) {
+  onNew(): void {
+    this.editorMode = "create";
+    this.editSchema = null;
+    this.editorOpen = true;
+  }
+
+  onEdit(): void {
+    if (!this.selectedSchema) {
+      return;
+    }
+    this.editorMode = "edit";
+    this.editSchema = this.selectedSchema;
+    this.editorOpen = true;
+  }
+
+  async onMove(): Promise<void> {
+    if (!this.selectedDefinition) {
+      return;
+    }
+    this.pickerMode = "move";
+    this.pickerTitle = "Move to folder";
+    this.pickerFolders = [];
+
+    try {
+      const subfolders = await this.contentTypeApi.listSchemaSubfolders(SYSTEM_SCHEMAS_FOLDER_ID);
+      this.pickerFolders = subfolders;
+    } catch {
+      this.pickerFolders = [];
+    }
+    this.pickerOpen = true;
+  }
+
+  onNewFolder(): void {
+    this.pickerMode = "create-folder";
+    this.pickerTitle = "Create folder";
+    this.pickerOpen = true;
+  }
+
+  async onEditorSaved(yaml: string): Promise<void> {
+    if (this.editorMode === "create") {
+      try {
+        await this.contentTypeApi.createSchema(yaml, this.selectedFolderId);
+        this.editorOpen = false;
+        await this.loadFolderDefinitions(this.selectedFolderId);
+      } catch (error) {
+        // Error handling would be improved in a future iteration
+        this.errorMessage = (error as Partial<ApiClientError>).message ?? "Request failed.";
+      }
+    } else if (this.editorMode === "edit" && this.selectedSchema) {
+      try {
+        const replaced = await this.contentTypeApi.replaceSchemaVersion(
+          this.selectedSchema.name,
+          this.selectedSchema.version,
+          yaml
+        );
+        this.editorOpen = false;
+        this.selectedSchema = replaced;
+        await this.loadFolderDefinitions(this.selectedFolderId);
+      } catch (error) {
+        this.errorMessage = (error as Partial<ApiClientError>).message ?? "Request failed.";
+      }
+    }
+  }
+
+  onEditorClosed(): void {
+    this.editorOpen = false;
+  }
+
+  async onPickerSelected(folderId: FolderId): Promise<void> {
+    if (!this.selectedDefinition) {
+      return;
+    }
+    try {
+      await this.contentTypeApi.moveContentTypeDefinition(this.selectedDefinition.name, folderId);
+      this.pickerOpen = false;
+      this.selectedDefinition = null;
+      this.selectedSchema = null;
+      await this.loadFolderDefinitions(this.selectedFolderId);
+      if (this.treeComponent) {
+        this.treeComponent.reloadFolder(this.selectedFolderId);
+      }
+    } catch (error) {
+      this.errorMessage = (error as Partial<ApiClientError>).message ?? "Request failed.";
+    }
+  }
+
+  async onPickerFolderCreated(name: string): Promise<void> {
+    try {
+      await this.contentTypeApi.createSchemaFolder(name, this.selectedFolderId);
+      this.pickerOpen = false;
+      if (this.treeComponent) {
+        this.treeComponent.reloadFolder(this.selectedFolderId);
+      }
+    } catch (error) {
+      this.errorMessage = (error as Partial<ApiClientError>).message ?? "Request failed.";
+    }
+  }
+
+  onPickerClosed(): void {
+    this.pickerOpen = false;
+  }
+
+  async onDeactivate(): Promise<void> {
+    if (!this.selectedDefinition || !this.selectedSchema) {
       return;
     }
 
     const confirmed =
       typeof globalThis.confirm === "function"
         ? globalThis.confirm(
-            `Deactivate ${this.selectedSummary.name} ${this.selectedSummary.version}?`
+            `Deactivate ${this.selectedSchema.name} ${this.selectedSchema.version}?`
           )
         : true;
 
@@ -889,155 +580,24 @@ export class ContentTypeSchemasPageComponent implements OnInit {
       return;
     }
 
-    this.saving = true;
-    this.detailErrorMessage = "";
-
     try {
       await this.contentTypeApi.deactivateSchemaVersion(
-        this.selectedSummary.name,
-        this.selectedSummary.version
+        this.selectedSchema.name,
+        this.selectedSchema.version
       );
+      this.selectedDefinition = null;
       this.selectedSchema = null;
-      this.selectedSummary = null;
-      this.replaceDraft = null;
-      await this.loadSchemas();
+      await this.loadFolderDefinitions(this.selectedFolderId);
     } catch (error) {
-      const apiError = error as Partial<ApiClientError>;
-      const message = apiError.message ?? "Request failed.";
-
-      this.applyDetailError(error);
-      await this.loadSchemas();
-      this.detailErrorMessage = message;
-    } finally {
-      this.saving = false;
+      this.errorMessage = (error as Partial<ApiClientError>).message ?? "Request failed.";
     }
   }
 
-  isSelected(summary: ContentTypeSchemaSummary): boolean {
-    const selected = this.selectedSummary;
-
-    return selected !== null && summary.name === selected.name && summary.version === selected.version;
+  trackDefinitionById(_index: number, definition: ContentTypeDefinition): string {
+    return definition.contentTypeDefinitionId;
   }
 
   trackFieldByIndex(index: number): number {
     return index;
   }
-
-  private async refreshAfterWrite(schema: ContentTypeSchemaDefinition): Promise<void> {
-    this.selectedSchema = schema;
-    this.selectedSummary = {
-      name: schema.name,
-      version: schema.version,
-      active: true
-    };
-    await this.loadSchemas();
-    await this.loadSchemaFolderContext();
-    const summary = this.findSummary(schema.name, schema.version);
-
-    if (summary) {
-      await this.selectSchema(summary);
-    }
-  }
-
-  private findSummary(
-    name: ContentTypeName | undefined,
-    version: ContentTypeVersion | undefined
-  ): ContentTypeSchemaSummary | null {
-    if (!name || !version) {
-      return null;
-    }
-
-    return (
-      this.schemas.find((schema) => schema.name === name && schema.version === version) ?? null
-    );
-  }
-
-  private applyPageError(error: unknown): void {
-    const apiError = error as Partial<ApiClientError>;
-
-    this.pageErrorMessage = apiError.message ?? "Request failed.";
-  }
-
-  private applyDetailError(error: unknown): void {
-    const apiError = error as Partial<ApiClientError>;
-
-    this.detailErrorMessage = apiError.message ?? "Request failed.";
-  }
-
-  private applyCreateError(error: unknown): void {
-    const apiError = error as Partial<ApiClientError>;
-
-    this.createErrorMessage = apiError.message ?? "Request failed.";
-    this.createValidationMessages = apiError.validationMessages ?? [];
-  }
-
-  private applyReplaceError(error: unknown): void {
-    const apiError = error as Partial<ApiClientError>;
-
-    this.replaceErrorMessage = apiError.message ?? "Request failed.";
-    this.replaceValidationMessages = apiError.validationMessages ?? [];
-  }
-
-  private clearCreateErrors(): void {
-    this.createErrorMessage = "";
-    this.createValidationMessages = [];
-  }
-
-  private clearReplaceErrors(): void {
-    this.replaceErrorMessage = "";
-    this.replaceValidationMessages = [];
-  }
-}
-
-function emptyFieldDraft(): SchemaFieldDraft {
-  return { name: "", type: "string", required: false };
-}
-
-function defaultCreateDraft(): SchemaDraft {
-  return {
-    name: "article",
-    version: "1.0",
-    fields: [{ name: "title", type: "string", required: true }]
-  };
-}
-
-function draftFromSchema(schema: ContentTypeSchemaDefinition): SchemaDraft {
-  return {
-    name: schema.name,
-    version: schema.version,
-    fields: schema.fields.map((field) => ({
-      name: field.name,
-      type: field.type,
-      required: field.required
-    }))
-  };
-}
-
-function moveField(fields: SchemaFieldDraft[], index: number, direction: -1 | 1): void {
-  const target = index + direction;
-
-  if (target < 0 || target >= fields.length) {
-    return;
-  }
-
-  const [moved] = fields.splice(index, 1);
-
-  if (moved) {
-    fields.splice(target, 0, moved);
-  }
-}
-
-function draftToYaml(draft: SchemaDraft): string {
-  const fields = draft.fields
-    .map(
-      (field) =>
-        `  - name: ${field.name}\n    type: ${field.type}\n    required: ${field.required}`
-    )
-    .join("\n");
-
-  return `name: ${draft.name}
-version: ${draft.version}
-fields:
-${fields}
-`;
 }
