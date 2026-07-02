@@ -106,7 +106,6 @@ ecmp-platform/
 |   |-- api-gateway/
 |   |-- identity-service/
 |   |-- content-service/
-|   |-- content-type-service/
 |   |-- publication-service/
 |   |-- publication-worker/
 |   `-- delivery-service/
@@ -497,8 +496,7 @@ Each service owns a specific part of the domain model and should expose that own
 | Service | Owns |
 | --- | --- |
 | Identity Service | Authentication, authorization, sessions, users, and role assignments. |
-| Content Type Service | Content type schemas and schema validation rules. |
-| Content Service | Content drafts, master records, folder hierarchy, content lifecycle state, and document metadata. |
+| Content Service | Content drafts, master records, folder hierarchy, content lifecycle state, document metadata, content type schemas, and content type definition objects. |
 | Publication Service | Publication and unpublication requests, publication state, and publication events. |
 | Publication Worker | Execution of publication and unpublication events between Management and Delivery stages. |
 | Delivery Service | Published read model access and internal delivery queries. |
@@ -509,10 +507,10 @@ Ownership rules:
 
 * The Content Service is the source of truth for draft and master content records.
 * The Content Service is the source of truth for the folder hierarchy used to organize content instances.
-* The Content Type Service is the source of truth for schemas.
+* The Content Service is the source of truth for content type schemas and content type definition objects, which are folder-contained repository objects under the reserved `/system/schemas` namespace (see [Content Type Definitions and the Schema Namespace](#content-type-definitions-and-the-schema-namespace)). A standalone Content Type Service previously owned schemas; that service was merged into the Content Service (see [ADR-0017](adr/0017-merge-content-type-service-into-content-service.md)) so folder occupancy, moves, and deletes stay within one consistency boundary.
 * The Publication Service is the source of truth for publication requests.
 * The Delivery Service exposes published read models but does not own authoring content.
-* The CMIS Browser Binding Adapter does not own data. It translates CMIS requests into existing Content Service, Content Type Service, and authorization behavior.
+* The CMIS Browser Binding Adapter does not own data. It translates CMIS requests into existing Content Service and authorization behavior.
 * The Identity Service is the source of truth for authentication, authorization, sessions, users, and roles.
 * The Publication Worker updates Delivery storage only as part of a publication or unpublication event.
 
@@ -586,12 +584,15 @@ Folders organize content instances into a hierarchical tree. Folder operations a
 
 | Method | Endpoint | Permission | Description |
 | --- | --- | --- | --- |
-| `GET` | `/api/management/folders` | `folder:read` | List folders, optionally filtered by parent folder. |
-| `GET` | `/api/management/folders/{folderId}` | `folder:read` | Retrieve a folder by ID. |
-| `POST` | `/api/management/folders` | `folder:create` | Create a new folder under an existing parent folder. |
-| `PATCH` | `/api/management/folders/{folderId}` | `folder:update` | Update folder metadata, such as the folder name. |
-| `DELETE` | `/api/management/folders/{folderId}` | `folder:delete` | Delete or archive a folder according to folder and content lifecycle rules. |
+| `GET` | `/api/management/folders` | `folder:read` (`content-type:read` under `/system/schemas`) | List folders, optionally filtered by parent folder. |
+| `GET` | `/api/management/folders/{folderId}` | `folder:read` (`content-type:read` under `/system/schemas`) | Retrieve a folder by ID. |
+| `POST` | `/api/management/folders` | `folder:create` (`content-type:create` under `/system/schemas`) | Create a new folder under an existing parent folder. |
+| `PATCH` | `/api/management/folders/{folderId}` | `folder:update` (`content-type:update` under `/system/schemas`) | Update folder metadata, such as the folder name. |
+| `POST` | `/api/management/folders/{folderId}/move` | `folder:update` (`content-type:update` under `/system/schemas`) | Move a folder under a different parent folder. |
+| `DELETE` | `/api/management/folders/{folderId}` | `folder:delete` (`content-type:delete` under `/system/schemas`) | Delete or archive a folder according to folder and content lifecycle rules. |
 | `GET` | `/api/management/folders/{folderId}/contents` | `folder:read` and `<contentTypeName>:read` | List content records assigned to a folder. |
+
+Folders inside the reserved `/system/schemas` namespace require the matching `content-type:*` permission instead of `folder:*`, since that namespace is schema administration surface, not authoring surface. The reserved `/system` and `/system/schemas` folders themselves reject rename, move, and delete regardless of permission (see [Content Type Definitions and the Schema Namespace](#content-type-definitions-and-the-schema-namespace)).
 
 Initial create/update payload shape:
 
@@ -617,16 +618,20 @@ Initial response shape:
 
 #### Content Type CRUD
 
-Owned by the Content Type Service.
+Owned by the Content Service.
 
 | Method | Endpoint | Permission | Description |
 | --- | --- | --- | --- |
-| `GET` | `/api/management/content-types` | `content-type:read` | List content type schemas. |
-| `GET` | `/api/management/content-types/{name}` | `content-type:read` | Retrieve the latest version of a content type schema. |
-| `GET` | `/api/management/content-types/{name}/versions/{version}` | `content-type:read` | Retrieve a specific content type schema version. |
-| `POST` | `/api/management/content-types` | `content-type:create` | Create a new content type schema. |
-| `PUT` | `/api/management/content-types/{name}/versions/{version}` | `content-type:update` | Replace an existing content type schema version. |
-| `DELETE` | `/api/management/content-types/{name}/versions/{version}` | `content-type:delete` | Delete or deactivate a content type schema version, depending on lifecycle rules. |
+| `GET` | `/api/management/content-types` | none (open to authoring workflows) | List active content type schema summaries, used to choose a content type when authoring content. |
+| `GET` | `/api/management/content-types/{name}` | none (open to authoring workflows) | Retrieve the latest active version of a content type schema. |
+| `GET` | `/api/management/content-types/{name}/versions/{version}` | none (open to authoring workflows) | Retrieve a specific content type schema version. |
+| `GET` | `/api/management/content-types/definitions?folderId={folderId}` | `content-type:read` | List content type definition objects assigned to a schema folder under `/system/schemas`. Admin-only. |
+| `POST` | `/api/management/content-types` | `content-type:create` | Create a new content type schema version, optionally targeting a schema folder via `folderId`. Admin-only. |
+| `PUT` | `/api/management/content-types/{name}/versions/{version}` | `content-type:update` | Replace an existing content type schema version. Admin-only. |
+| `DELETE` | `/api/management/content-types/{name}/versions/{version}` | `content-type:delete` | Soft deactivate a content type schema version. Admin-only. |
+| `POST` | `/api/management/content-types/{name}/move` | `content-type:update` | Move a content type definition object to another schema folder under `/system/schemas`. Admin-only. |
+
+Active schema summary and definition reads are intentionally split: listing/retrieving active schemas by name stays available to authoring workflows so any authenticated user can choose a content type, while schema folder browsing (`/definitions`) and every write remain administrator-only, enforced through the `content-type:*` permissions above.
 
 Initial create/update payload shape:
 
@@ -788,47 +793,32 @@ Storage:
 
 ### Content Service
 
-Manages content instances, folders, and document metadata.
+Manages content instances, folders, document metadata, content type schemas, and content type definition objects. A standalone Content Type Service originally owned schemas; it was merged into the Content Service (see [ADR-0017](adr/0017-merge-content-type-service-into-content-service.md)) because content type definitions are folder-contained repository objects and folder occupancy, moves, and deletes need to stay inside one transactional/consistency boundary rather than requiring cross-service coordination.
 
 Ownership:
 
 * Content drafts
 * Master content records
-* Folder hierarchy
+* Folder hierarchy, including the reserved `/system` and `/system/schemas` namespace
 * Content lifecycle state
 * Document metadata
+* Content type schemas and schema version lifecycle
+* Content type definition objects (folder-contained, under `/system/schemas`)
 
 Responsibilities:
 
 * Content CRUD operations
-* Folder CRUD operations
+* Folder CRUD operations, including protected-folder and schema-namespace rules
 * Content validation
 * Content lifecycle management
 * Basic content versioning
+* Content type schema definition, validation, and YAML parsing
+* Schema folder administration and content type definition moves (admin-only)
 
 Storage:
 
-* MongoDB for content metadata, folder metadata, and structured content
+* MongoDB for content metadata, folder metadata, structured content, and content type schemas
 * Filesystem-backed storage for binary files
-
-### Content Type Service
-
-Manages content schemas.
-
-Ownership:
-
-* Content type schemas
-* Schema validation rules
-
-Responsibilities:
-
-* Content type definition
-* Schema validation
-* YAML schema parsing
-
-Storage:
-
-* MongoDB
 
 ### Publication Service
 
@@ -928,6 +918,8 @@ Object Type
   |-- Document Type
   |    `-- Document instance
   `-- Content Type Definition
+       |-- Content type definition object "generic" (repository object under /system/schemas)
+       |-- Content type definition object "some-other-type" (repository object under /system/schemas)
        |-- Generic Content Type
        |    `-- Content record instance of Generic
        `-- Some Other User Content Type
@@ -936,7 +928,7 @@ Object Type
 
 `Document Type` is the object-type/domain name for binary content objects that carry a stored content stream. Existing file storage names and `/api/management/files` routes remain as compatibility and storage details; they do not change the `Document` object-type terminology.
 
-`Content Type Definition` is the common parent of every user-defined content type. A user content type such as `generic` is an object-type definition whose parent is `Content Type Definition`. Resource instances always reference a concrete type definition — folder instances reference Folder Type, document instances reference Document Type, and content records reference the user content type selected at creation — never the internal `Object Type` root directly.
+`Content Type Definition` is the common parent of every user-defined content type, and is also the concrete object type of the content type definition object itself. Each user content type such as `generic` has two distinct representations: a folder-contained repository object of type `Content Type Definition`, assigned to a schema folder under `/system/schemas` (see [Content Type Definitions and the Schema Namespace](#content-type-definitions-and-the-schema-namespace)); and a derived user content type (e.g. `ecmp:generic`) whose parent is `Content Type Definition`, referenced by content record instances. Resource instances always reference a concrete type definition — folder instances reference Folder Type, document instances reference Document Type, content type definition objects reference Content Type Definition directly, and content records reference the derived user content type selected at creation — never the internal `Object Type` root directly.
 
 Every object-type definition exposes common, CMIS-compatible attributes: `id`, `localName`, `localNamespace`, `queryName`, `displayName`, `baseId`, `parentId`, `description`, `creatable`, `fileable`, `queryable`, `controllablePolicy`, `controllableACL`, `fulltextIndexed`, `includedInSupertypeQuery`, and `typeMutability`. In this slice the unsupported behavior flags (query, policy, ACL, full-text, and type mutability) are set conservatively to `false`.
 
@@ -948,7 +940,7 @@ ECMP has internal platform types that are required by the system and are not mod
 | --- | --- | --- | --- |
 | Folder | Folder Type | Internal type used to group content instances into a hierarchical tree. | Cannot be extended by users. |
 | Document | Document Type | Internal type used to represent uploaded binary content and its metadata. | Cannot be extended by users. |
-| Content type | Content Type Definition | Internal parent type used to define schemas for content instances. | Users can create new content type schemas as needed. |
+| Content type definition | Content Type Definition | Internal parent type used to define schemas for content instances. Each user content type also has a concrete folder-contained instance of this type under `/system/schemas`. | Users (administrators) can create new content type definitions as needed. |
 
 User-defined content types extend the platform by adding schemas for business content, such as articles, landing pages, or product descriptions. They descend from `Content Type Definition` and do not extend the internal Folder or Document types.
 
@@ -1037,7 +1029,7 @@ In this example, `title` is required and `description` is optional.
 
 ### Global ID Strategy
 
-Content records, folders, and documents will use globally unique identifiers generated by the platform.
+Content records, folders, documents, and content type definitions will use globally unique identifiers generated by the platform.
 
 Initial rules:
 
@@ -1049,7 +1041,9 @@ Initial rules:
 * Content instance IDs use the `RCD-` prefix.
 * Folder IDs use the `FLD-` prefix.
 * Document IDs use the `STF-` compatibility prefix.
+* Content type definition object IDs use the `CTD-` prefix.
 * The root folder `/` has a reserved folder ID.
+* The `/system` and `/system/schemas` folders have reserved folder IDs.
 
 Example:
 
@@ -1057,7 +1051,10 @@ Example:
 contentId: RCD-550e8400-e29b-41d4-a716-446655440000
 folderId: FLD-550e8400-e29b-41d4-a716-446655440001
 fileId: STF-550e8400-e29b-41d4-a716-446655440002
+contentTypeDefinitionId: CTD-550e8400-e29b-41d4-a716-446655440003
 rootFolderId: FLD-root
+systemFolderId: FLD-system
+systemSchemasFolderId: FLD-system-schemas
 ```
 
 Some examples in this document may use readable placeholder identifiers to keep the documentation easy to follow, but implementation payloads should use prefixed global IDs.
@@ -1113,6 +1110,35 @@ Folder validation rules:
 * Folder names must be unique within the same parent folder.
 
 Exact forbidden symbol lists may be refined during implementation based on the target operating systems and storage strategy.
+
+Protected system folders:
+
+* The root folder plus two reserved administrative folders, `/system` (`FLD-system`) and `/system/schemas` (`FLD-system-schemas`), are seeded on startup.
+* `/system` and `/system/schemas` reject rename, move, and delete regardless of caller permission — they are structural, not merely permission-gated.
+* Normal content records and documents cannot be created directly in `/system`, `/system/schemas`, or any schema folder beneath it; those namespaces are administrative, not authoring destinations.
+* Schema subfolders created by administrators under `/system/schemas` are ordinary folders otherwise: they can be renamed, moved (as long as they stay within `/system/schemas`), and deleted once empty. See [Content Type Definitions and the Schema Namespace](#content-type-definitions-and-the-schema-namespace).
+
+### Content Type Definitions and the Schema Namespace
+
+Content type definitions are folder-contained repository objects, not a flat registry. Each user content type (e.g. `article`) is represented by one content type definition object that groups every schema version sharing that name; administrators move the definition as a whole rather than moving individual schema versions independently.
+
+Content type definition fields:
+
+| Field | Description |
+| --- | --- |
+| `contentTypeDefinitionId` | Globally unique content type definition identifier generated by the platform, using the `CTD-` prefix. |
+| `folderId` | The schema folder that owns this definition, always a descendant of (or equal to) `/system/schemas`. |
+| `name` | The content type name shared by all grouped schema versions. |
+| `versions` | The schema version summaries (`name`, `version`, `active`) grouped under this definition. |
+| `createdAt` / `updatedAt` | UTC timestamps for the definition object. |
+
+Rules:
+
+* Every content type definition is assigned to a folder under `/system/schemas`; creating or moving a definition outside that namespace is rejected as a conflict.
+* Administrators can create, rename, move, and delete schema subfolders under `/system/schemas`, and move content type definitions between those subfolders, without changing the definition's name or its schema versions.
+* A schema folder cannot be deleted while it still contains child folders or content type definition objects — content type definitions count toward folder occupancy the same way content records and documents do.
+* Schema folder browsing (listing definitions, creating schema subfolders, moving definitions, and all schema version writes) requires the `content-type:*` administrator permission. Listing/retrieving active schema summaries by name stays open to authoring workflows so any authenticated user can choose a content type when creating content — administration and consumption are deliberately separate concerns.
+* CMIS navigation does not expose `/system/schemas` or content type definition repository objects as browsable folder children, object lookups, or path lookups; CMIS type discovery continues to list active user content types as `ecmp:<name>` custom types (see [CMIS Compatibility API](#cmis-compatibility-api)).
 
 ### Basic Versioning
 
@@ -1641,12 +1667,31 @@ Management and Delivery data must not share the same MongoDB collections. The mi
 
 ### Content Type Collection
 
+Individual schema versions remain stored per `name + version`, but are grouped under one folder-contained content type definition object per content type name (see [Content Type Definitions and the Schema Namespace](#content-type-definitions-and-the-schema-namespace)).
+
 ```json
 {
   "_id": "...",
   "name": "generic",
   "version": "1.0",
+  "active": true,
   "schema": {}
+}
+```
+
+### Content Type Definition Collection
+
+```json
+{
+  "_id": "...",
+  "contentTypeDefinitionId": "CTD-550e8400-e29b-41d4-a716-446655440003",
+  "folderId": "FLD-system-schemas",
+  "name": "generic",
+  "versions": [
+    { "name": "generic", "version": "1.0", "active": true }
+  ],
+  "createdAt": "2026-06-01T10:00:00.000Z",
+  "updatedAt": "2026-06-01T10:00:00.000Z"
 }
 ```
 
@@ -1717,6 +1762,8 @@ Initial CMIS object mapping:
 | Allowable actions | Existing RBAC permissions and object lifecycle constraints |
 
 Structured content records map to custom object types with `cmis:item` as their base type, so CMIS type discovery advertises `cmis:folder`, `cmis:document`, `cmis:item`, `ecmp:content-type-definition`, and the active ECMP custom content types. Every returned object-type definition exposes the CMIS 1.1 common object-type attributes (identity, hierarchy, display, behavior flags, indexing flags, and type mutability) with conservative defaults: base types use `parentId: null`, `ecmp:content-type-definition` uses `parentId: cmis:item`, custom content types use `parentId: ecmp:content-type-definition`, and `queryable`, `controllablePolicy`, `controllableACL`, `fulltextIndexed`, `includedInSupertypeQuery`, and all `typeMutability` flags stay `false` while the matching CMIS services are unsupported. The optional base types `cmis:relationship`, `cmis:policy`, and `cmis:secondary` are not advertised until ECMP has backing domain behavior for them.
+
+Type discovery is the only place `ecmp:content-type-definition` and the active user content types are exposed. The `/system/schemas` namespace and the folder-contained content type definition repository objects within it (as opposed to the type metadata they define) are not exposed through CMIS navigation: they are excluded from folder children responses, and object lookup by ID or by path under `/system/schemas` returns a CMIS not-found response. Schema administration is an authenticated management-UI concern, not a CMIS-browsable one.
 
 The first CMIS slice should target Browser Binding operations for repository discovery, type discovery, folder children, object lookup by ID, object lookup by path, document content stream retrieval, folder creation, document creation (document-backed), and supported object deletion.
 
@@ -1902,7 +1949,6 @@ management-frontend
 api-gateway
 identity-service
 content-service
-content-type-service
 publication-service
 publication-worker
 delivery-service
@@ -1945,7 +1991,6 @@ management-frontend
 api-gateway
 identity-service
 content-service
-content-type-service
 publication-service
 publication-worker
 delivery-service
@@ -2030,7 +2075,7 @@ Initial API Gateway routing:
 | `/api/management/contents*` | Content Service |
 | `/api/management/folders*` | Content Service |
 | `/api/management/files*` | Content Service |
-| `/api/management/content-types*` | Content Type Service |
+| `/api/management/content-types*` | Content Service |
 | `/api/management/*publication-requests*` | Publication Service |
 | `/api/delivery/contents*` | Delivery Service |
 | `/api/cmis*` | CMIS Browser Binding Adapter |

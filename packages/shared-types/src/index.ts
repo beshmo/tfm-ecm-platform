@@ -1,11 +1,22 @@
-export type GlobalIdPrefix = "RCD" | "FLD" | "STF" | "USR";
+export type GlobalIdPrefix = "RCD" | "FLD" | "STF" | "USR" | "CTD";
 
 export type ContentId = `RCD-${string}`;
 export type FolderId = `FLD-${string}`;
 export type StaticFileId = `STF-${string}`;
 export type UserId = `USR-${string}`;
+export type ContentTypeDefinitionId = `CTD-${string}`;
 
 export const ROOT_FOLDER_ID: FolderId = "FLD-root";
+
+/**
+ * Reserved administrative folders. `/system` groups platform-managed
+ * namespaces; `/system/schemas` holds content type definition objects.
+ * These folders cannot be renamed, moved, or deleted.
+ */
+export const SYSTEM_FOLDER_ID: FolderId = "FLD-system";
+export const SYSTEM_SCHEMAS_FOLDER_ID: FolderId = "FLD-system-schemas";
+export const SYSTEM_FOLDER_PATH = "/system";
+export const SYSTEM_SCHEMAS_FOLDER_PATH = "/system/schemas";
 
 export interface Folder {
   folderId: FolderId;
@@ -31,7 +42,9 @@ export type FolderErrorCode =
   | "INVALID_FOLDER_NAME"
   | "DUPLICATE_FOLDER_NAME"
   | "ROOT_FOLDER_OPERATION_NOT_ALLOWED"
-  | "FOLDER_NOT_EMPTY";
+  | "FOLDER_NOT_EMPTY"
+  | "PROTECTED_FOLDER_OPERATION_NOT_ALLOWED"
+  | "SCHEMA_NAMESPACE_CONFLICT";
 
 export type Role = "Admin" | "Creator" | "Reviewer" | "Publisher";
 
@@ -84,6 +97,31 @@ export interface ContentTypeSchemaSummary {
   version: ContentTypeVersion;
   active: boolean;
 }
+
+/**
+ * A content type definition as a folder-contained repository object under
+ * `/system/schemas`. The definition is the movable unit; schema versions are
+ * lifecycle records grouped beneath it.
+ */
+export interface ContentTypeDefinition {
+  contentTypeDefinitionId: ContentTypeDefinitionId;
+  /** The concrete ECMP object type: always the Content Type Definition type. */
+  objectTypeId: EcmpObjectTypeId;
+  folderId: FolderId;
+  name: ContentTypeName;
+  versions: ContentTypeSchemaSummary[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContentTypeDefinitionMoveInput {
+  targetFolderId: FolderId;
+}
+
+export type ContentTypeDefinitionErrorCode =
+  | "CONTENT_TYPE_DEFINITION_NOT_FOUND"
+  | "SCHEMA_FOLDER_NOT_FOUND"
+  | "SCHEMA_NAMESPACE_CONFLICT";
 
 export const INITIAL_GENERIC_CONTENT_TYPE_SCHEMA: ContentTypeSchemaDefinition = {
   name: "generic",

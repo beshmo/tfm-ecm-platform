@@ -35,10 +35,11 @@ Object Type
   |-- Folder Type          -> folder instances
   |-- Document Type        -> binary content (Document) instances
   `-- Content Type Definition
+       |-- Content type definition objects (folder-contained, under /system/schemas)
        `-- User content types (e.g. generic) -> content record instances
 ```
 
-`Document Type` is the domain term for binary content objects with a stored content stream; existing file storage and file routes remain as compatibility details. `Content Type Definition` is the common parent of every user-defined content type. See [Architecture](docs/architecture.md) for the full object-type model and its CMIS projection.
+`Document Type` is the domain term for binary content objects with a stored content stream; existing file storage and file routes remain as compatibility details. `Content Type Definition` is the common parent of every user-defined content type, and each user content type also has a folder-contained instance of that type stored under the reserved `/system/schemas` namespace, administered by admins only. See [Architecture](docs/architecture.md) for the full object-type model and its CMIS projection.
 
 ## Documentation
 
@@ -146,7 +147,6 @@ ecmp-platform/
 |   |-- api-gateway/
 |   |-- identity-service/
 |   |-- content-service/
-|   |-- content-type-service/
 |   |-- publication-service/
 |   |-- publication-worker/
 |   `-- delivery-service/
@@ -244,7 +244,7 @@ Runtime configuration:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `CONTENT_TYPE_SCHEMA_YAML_MAX_BYTES` | `65536` | Maximum author-facing YAML schema source size accepted by the Content Type Service for schema create and replace requests. |
+| `CONTENT_TYPE_SCHEMA_YAML_MAX_BYTES` | `65536` | Maximum author-facing YAML schema source size accepted by the Content Service for schema create and replace requests. |
 
 Run the Angular Management Frontend:
 

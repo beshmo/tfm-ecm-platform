@@ -1,13 +1,22 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import type { ContentTypeSchemaDefinition, ContentTypeSchemaSummary } from "@ecmp/shared-types";
+import type {
+  ContentTypeDefinition,
+  ContentTypeSchemaDefinition,
+  ContentTypeSchemaSummary,
+  Folder
+} from "@ecmp/shared-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ContentTypeApiClient } from "../infrastructure/content-type-api.client";
 import { ContentTypeSchemasPageComponent } from "./content-type-schemas-page.component";
 
+const SCHEMAS_FOLDER_ID = "FLD-system-schemas";
+
 describe("content type schemas page integration", () => {
   let summaries: ContentTypeSchemaSummary[];
   let definitions: Map<string, ContentTypeSchemaDefinition>;
+  let schemaSubfolders: Folder[];
+  let folderDefinitions: ContentTypeDefinition[];
   let contentTypeApi: {
     listSchemas: ReturnType<typeof vi.fn>;
     getLatestSchema: ReturnType<typeof vi.fn>;
@@ -15,11 +24,18 @@ describe("content type schemas page integration", () => {
     createSchema: ReturnType<typeof vi.fn>;
     replaceSchemaVersion: ReturnType<typeof vi.fn>;
     deactivateSchemaVersion: ReturnType<typeof vi.fn>;
+    getSchemaFolder: ReturnType<typeof vi.fn>;
+    listSchemaSubfolders: ReturnType<typeof vi.fn>;
+    createSchemaFolder: ReturnType<typeof vi.fn>;
+    listContentTypeDefinitions: ReturnType<typeof vi.fn>;
+    moveContentTypeDefinition: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
     summaries = [{ name: "generic", version: "1.0", active: true }];
     definitions = new Map([[schemaKey("generic", "1.0"), schema("generic", "1.0")]]);
+    schemaSubfolders = [folder("FLD-news", "news", "/system/schemas/news", SCHEMAS_FOLDER_ID)];
+    folderDefinitions = [definition("generic", SCHEMAS_FOLDER_ID)];
     contentTypeApi = {
       listSchemas: vi.fn(() => Promise.resolve([...summaries])),
       getLatestSchema: vi.fn(),
@@ -49,7 +65,20 @@ describe("content type schemas page integration", () => {
           (summary) => summary.name !== name || summary.version !== version
         );
         return Promise.resolve();
-      })
+      }),
+      getSchemaFolder: vi.fn(() =>
+        Promise.resolve(folder(SCHEMAS_FOLDER_ID, "schemas", "/system/schemas", "FLD-system"))
+      ),
+      listSchemaSubfolders: vi.fn(() => Promise.resolve([...schemaSubfolders])),
+      createSchemaFolder: vi.fn((name: string) =>
+        Promise.resolve(
+          folder(`FLD-${name}`, name, `/system/schemas/${name}`, SCHEMAS_FOLDER_ID)
+        )
+      ),
+      listContentTypeDefinitions: vi.fn(() => Promise.resolve([...folderDefinitions])),
+      moveContentTypeDefinition: vi.fn((name: string, targetFolderId: string) =>
+        Promise.resolve(definition(name, targetFolderId))
+      )
     };
 
     await TestBed.configureTestingModule({
@@ -86,9 +115,13 @@ describe("content type schemas page integration", () => {
     await settle(fixture);
 
     expect(contentTypeApi.createSchema).toHaveBeenCalledWith(
-      expect.stringContaining("- name: headline")
+      expect.stringContaining("- name: headline"),
+      SCHEMAS_FOLDER_ID
     );
-    expect(contentTypeApi.createSchema).toHaveBeenCalledWith(expect.stringContaining("name: article"));
+    expect(contentTypeApi.createSchema).toHaveBeenCalledWith(
+      expect.stringContaining("name: article"),
+      SCHEMAS_FOLDER_ID
+    );
     expect(pageText(fixture)).toContain("article");
     expect(pageText(fixture)).toContain("headline");
   });
@@ -257,6 +290,63 @@ describe("content type schemas page integration", () => {
     vi.unstubAllGlobals();
   });
 
+  it("loads the /system/schemas folder context with subfolders and definitions", async () => {
+    const fixture = await renderPage();
+
+    expect(contentTypeApi.getSchemaFolder).toHaveBeenCalledWith(SCHEMAS_FOLDER_ID);
+    expect(contentTypeApi.listSchemaSubfolders).toHaveBeenCalledWith(SCHEMAS_FOLDER_ID);
+    expect(contentTypeApi.listContentTypeDefinitions).toHaveBeenCalledWith(SCHEMAS_FOLDER_ID);
+    expect(pageText(fixture)).toContain("Schema Folders");
+    expect(pageText(fixture)).toContain("news");
+  });
+
+  it("navigates into a schema subfolder and reloads its context", async () => {
+    const fixture = await renderPage();
+
+    clickAriaButton(fixture, "Open news");
+    await settle(fixture);
+
+    expect(contentTypeApi.listSchemaSubfolders).toHaveBeenLastCalledWith("FLD-news");
+    expect(contentTypeApi.listContentTypeDefinitions).toHaveBeenLastCalledWith("FLD-news");
+  });
+
+  it("creates a schema folder under the current schema folder", async () => {
+    const fixture = await renderPage();
+
+    setInputValue(fixture, "newSchemaFolderName", "archive");
+    clickButton(fixture, "Create folder");
+    await settle(fixture);
+
+    expect(contentTypeApi.createSchemaFolder).toHaveBeenCalledWith("archive", SCHEMAS_FOLDER_ID);
+  });
+
+  it("moves a content type definition to the selected target folder", async () => {
+    const fixture = await renderPage();
+
+    setSelectValue(fixture, "moveTarget-generic", "FLD-news");
+    clickButton(fixture, "Move");
+    await settle(fixture);
+
+    expect(contentTypeApi.moveContentTypeDefinition).toHaveBeenCalledWith("generic", "FLD-news");
+  });
+
+  it("shows a forbidden message when schema folder creation is rejected", async () => {
+    contentTypeApi.createSchemaFolder.mockRejectedValueOnce({
+      status: 403,
+      message: "Administrator permission is required for schema administration.",
+      validationMessages: []
+    });
+    const fixture = await renderPage();
+
+    setInputValue(fixture, "newSchemaFolderName", "archive");
+    clickButton(fixture, "Create folder");
+    await settle(fixture);
+
+    expect(pageText(fixture)).toContain(
+      "Administrator permission is required for schema administration."
+    );
+  });
+
   async function renderPage(): Promise<ComponentFixture<ContentTypeSchemasPageComponent>> {
     const fixture = TestBed.createComponent(ContentTypeSchemasPageComponent);
 
@@ -378,6 +468,21 @@ function clickButton(
   button.click();
 }
 
+function clickAriaButton(
+  fixture: ComponentFixture<ContentTypeSchemasPageComponent>,
+  ariaLabel: string
+): void {
+  const button = fixture.nativeElement.querySelector(
+    `button[aria-label="${ariaLabel}"]`
+  ) as HTMLButtonElement | null;
+
+  if (!button) {
+    throw new Error(`Button with aria-label ${ariaLabel} was not found.`);
+  }
+
+  button.click();
+}
+
 function formElement(
   fixture: ComponentFixture<ContentTypeSchemasPageComponent>,
   ariaLabel: string
@@ -462,5 +567,33 @@ function schemaWithFields(
       type: "string" as const,
       required: false
     }))
+  };
+}
+
+function folder(
+  folderId: string,
+  name: string,
+  path: string,
+  parentFolderId: string
+): Folder {
+  return {
+    folderId: folderId as Folder["folderId"],
+    name,
+    parentFolderId: parentFolderId as Folder["parentFolderId"],
+    path,
+    createdAt: "2026-06-29T10:00:00.000Z",
+    updatedAt: "2026-06-29T10:00:00.000Z"
+  };
+}
+
+function definition(name: string, folderId: string): ContentTypeDefinition {
+  return {
+    contentTypeDefinitionId: `CTD-${name}` as ContentTypeDefinition["contentTypeDefinitionId"],
+    objectTypeId: "ecmp:content-type-definition",
+    folderId: folderId as ContentTypeDefinition["folderId"],
+    name,
+    versions: [{ name, version: "1.0", active: true }],
+    createdAt: "2026-06-29T10:00:00.000Z",
+    updatedAt: "2026-06-29T10:00:00.000Z"
   };
 }

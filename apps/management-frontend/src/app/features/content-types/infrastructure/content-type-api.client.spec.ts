@@ -134,6 +134,70 @@ describe("content type api client", () => {
     });
   });
 
+  it("loads schema folder context and folder-scoped definitions through gateway URLs", async () => {
+    const folder = {
+      folderId: "FLD-system-schemas",
+      name: "schemas",
+      parentFolderId: "FLD-system",
+      path: "/system/schemas",
+      createdAt: "2026-06-29T10:00:00.000Z",
+      updatedAt: "2026-06-29T10:00:00.000Z"
+    };
+    const http = {
+      get: vi
+        .fn()
+        .mockReturnValueOnce(of(folder))
+        .mockReturnValueOnce(of([folder]))
+        .mockReturnValueOnce(of([{ name: "generic", folderId: "FLD-system-schemas" }]))
+    };
+    const client = new ContentTypeApiClient(http as never);
+
+    await expect(client.getSchemaFolder("FLD-system-schemas" as never)).resolves.toEqual(folder);
+    await expect(client.listSchemaSubfolders("FLD-system-schemas" as never)).resolves.toEqual([
+      folder
+    ]);
+    await client.listContentTypeDefinitions("FLD-system-schemas" as never);
+
+    expect(http.get).toHaveBeenNthCalledWith(1, "/api/management/folders/FLD-system-schemas");
+    expect(http.get).toHaveBeenNthCalledWith(
+      2,
+      "/api/management/folders?parentFolderId=FLD-system-schemas"
+    );
+    expect(http.get).toHaveBeenNthCalledWith(
+      3,
+      "/api/management/content-types/definitions?folderId=FLD-system-schemas"
+    );
+  });
+
+  it("creates schema folders, schemas with a folder, and moves definitions through gateway URLs", async () => {
+    const http = {
+      post: vi
+        .fn()
+        .mockReturnValueOnce(of({ folderId: "FLD-news" }))
+        .mockReturnValueOnce(of(INITIAL_GENERIC_CONTENT_TYPE_SCHEMA))
+        .mockReturnValueOnce(of({ name: "generic", folderId: "FLD-news" }))
+    };
+    const client = new ContentTypeApiClient(http as never);
+
+    await client.createSchemaFolder("news", "FLD-system-schemas" as never);
+    await client.createSchema("name: generic", "FLD-system-schemas" as never);
+    await client.moveContentTypeDefinition("generic" as never, "FLD-news" as never);
+
+    expect(http.post).toHaveBeenNthCalledWith(1, "/api/management/folders", {
+      name: "news",
+      parentFolderId: "FLD-system-schemas"
+    });
+    expect(http.post).toHaveBeenNthCalledWith(2, "/api/management/content-types", {
+      schemaSource: "name: generic",
+      folderId: "FLD-system-schemas"
+    });
+    expect(http.post).toHaveBeenNthCalledWith(
+      3,
+      "/api/management/content-types/generic/move",
+      { targetFolderId: "FLD-news" }
+    );
+  });
+
   it("maps representative schema write conflict and oversized errors", async () => {
     const http = {
       put: vi.fn().mockReturnValueOnce(

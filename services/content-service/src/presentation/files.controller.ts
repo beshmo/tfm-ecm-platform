@@ -7,6 +7,7 @@ import type {
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Delete,
   Get,
@@ -38,6 +39,7 @@ import {
   StaticFileFolderNotFoundError,
   StaticFileNotFoundError,
   StaticFileStorageError,
+  StaticFileSystemNamespaceError,
   StaticFileUploadTooLargeError,
   UnsupportedStaticFileUploadMimeTypeError
 } from "../application/static-file.errors";
@@ -201,6 +203,10 @@ function mapStaticFileError(error: unknown): Error {
     error instanceof StaticFileFolderNotFoundError
   ) {
     return new NotFoundException(error.message);
+  }
+
+  if (error instanceof StaticFileSystemNamespaceError) {
+    return new ConflictException(error.message);
   }
 
   if (error instanceof StaticFileUploadTooLargeError) {

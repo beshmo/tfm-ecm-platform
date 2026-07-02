@@ -1,6 +1,7 @@
 import type { FolderId, StaticFileId, StaticFileUpdateInput } from "@ecmp/shared-types";
 
 import type { FolderRepository } from "../domain/folder.repository";
+import { isSystemNamespacePath } from "../domain/system-folder";
 import {
   StaticFileNameValidationError,
   StaticFileTooLargeError,
@@ -18,6 +19,7 @@ import {
   StaticFileFolderNotFoundError,
   StaticFileNotFoundError,
   StaticFileStorageError,
+  StaticFileSystemNamespaceError,
   StaticFileUploadTooLargeError,
   UnsupportedStaticFileUploadMimeTypeError
 } from "./static-file.errors";
@@ -153,6 +155,10 @@ async function ensureFolderExists(
 
   if (!folder) {
     throw new StaticFileFolderNotFoundError(folderId);
+  }
+
+  if (isSystemNamespacePath(folder.path)) {
+    throw new StaticFileSystemNamespaceError(folderId);
   }
 }
 

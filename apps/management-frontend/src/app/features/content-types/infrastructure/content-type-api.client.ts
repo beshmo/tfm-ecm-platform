@@ -1,10 +1,13 @@
 import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import type {
+  ContentTypeDefinition,
   ContentTypeName,
   ContentTypeSchemaDefinition,
   ContentTypeSchemaSummary,
-  ContentTypeVersion
+  ContentTypeVersion,
+  Folder,
+  FolderId
 } from "@ecmp/shared-types";
 import { firstValueFrom } from "rxjs";
 
@@ -53,12 +56,76 @@ export class ContentTypeApiClient {
     }
   }
 
-  async createSchema(schemaSource: string): Promise<ContentTypeSchemaDefinition> {
+  async createSchema(
+    schemaSource: string,
+    folderId?: FolderId
+  ): Promise<ContentTypeSchemaDefinition> {
     try {
       return await firstValueFrom(
-        this.http.post<ContentTypeSchemaDefinition>("/api/management/content-types", {
-          schemaSource
-        })
+        this.http.post<ContentTypeSchemaDefinition>(
+          "/api/management/content-types",
+          folderId ? { schemaSource, folderId } : { schemaSource }
+        )
+      );
+    } catch (error) {
+      throw toApiClientError(error);
+    }
+  }
+
+  async getSchemaFolder(folderId: FolderId): Promise<Folder> {
+    try {
+      return await firstValueFrom(
+        this.http.get<Folder>(`/api/management/folders/${encodeURIComponent(folderId)}`)
+      );
+    } catch (error) {
+      throw toApiClientError(error);
+    }
+  }
+
+  async listSchemaSubfolders(parentFolderId: FolderId): Promise<Folder[]> {
+    try {
+      return await firstValueFrom(
+        this.http.get<Folder[]>(
+          `/api/management/folders?parentFolderId=${encodeURIComponent(parentFolderId)}`
+        )
+      );
+    } catch (error) {
+      throw toApiClientError(error);
+    }
+  }
+
+  async createSchemaFolder(name: string, parentFolderId: FolderId): Promise<Folder> {
+    try {
+      return await firstValueFrom(
+        this.http.post<Folder>("/api/management/folders", { name, parentFolderId })
+      );
+    } catch (error) {
+      throw toApiClientError(error);
+    }
+  }
+
+  async listContentTypeDefinitions(folderId: FolderId): Promise<ContentTypeDefinition[]> {
+    try {
+      return await firstValueFrom(
+        this.http.get<ContentTypeDefinition[]>(
+          `/api/management/content-types/definitions?folderId=${encodeURIComponent(folderId)}`
+        )
+      );
+    } catch (error) {
+      throw toApiClientError(error);
+    }
+  }
+
+  async moveContentTypeDefinition(
+    name: ContentTypeName,
+    targetFolderId: FolderId
+  ): Promise<ContentTypeDefinition> {
+    try {
+      return await firstValueFrom(
+        this.http.post<ContentTypeDefinition>(
+          `/api/management/content-types/${encodeURIComponent(name)}/move`,
+          { targetFolderId }
+        )
       );
     } catch (error) {
       throw toApiClientError(error);

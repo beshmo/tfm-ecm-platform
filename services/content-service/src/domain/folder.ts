@@ -107,6 +107,19 @@ export function renameFolderRecord(
   };
 }
 
+export function moveFolderRecord(
+  folder: FolderRecord,
+  targetParent: FolderRecord,
+  now: Date = new Date()
+): FolderRecord {
+  return {
+    ...cloneFolderRecord(folder),
+    parentFolderId: targetParent.folderId,
+    path: buildFolderPath(targetParent.path, folder.name),
+    updatedAt: new Date(now)
+  };
+}
+
 export function applyRenamedAncestorPath(
   folder: FolderRecord,
   previousAncestorPath: string,

@@ -62,7 +62,7 @@ describe("api-gateway management proxy", () => {
     );
   });
 
-  it("GIVEN a content type request WHEN proxied THEN it forwards to the Content Type Service", async () => {
+  it("GIVEN a content type request WHEN proxied THEN it forwards to the Content Service", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { name: "generic", version: "1.0" }));
 
     await request(app.getHttpServer())
@@ -71,12 +71,12 @@ describe("api-gateway management proxy", () => {
       .expect({ name: "generic", version: "1.0" });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:3003/api/management/content-types/generic/versions/1.0",
+      "http://localhost:3002/api/management/content-types/generic/versions/1.0",
       expect.objectContaining({ method: "GET" })
     );
   });
 
-  it("GIVEN a content type create request WHEN proxied THEN it forwards JSON body to the Content Type Service", async () => {
+  it("GIVEN a content type create request WHEN proxied THEN it forwards JSON body to the Content Service", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(201, { name: "article", version: "1.0" }));
 
     await request(app.getHttpServer())
@@ -86,7 +86,7 @@ describe("api-gateway management proxy", () => {
       .expect({ name: "article", version: "1.0" });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:3003/api/management/content-types",
+      "http://localhost:3002/api/management/content-types",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
@@ -106,7 +106,7 @@ describe("api-gateway management proxy", () => {
       .expect({ name: "article", version: "1.0" });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:3003/api/management/content-types/article/versions/1.0",
+      "http://localhost:3002/api/management/content-types/article/versions/1.0",
       expect.objectContaining({
         method: "PUT",
         body: JSON.stringify({
@@ -124,7 +124,7 @@ describe("api-gateway management proxy", () => {
       .expect(204);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:3003/api/management/content-types/article/versions/1.0",
+      "http://localhost:3002/api/management/content-types/article/versions/1.0",
       expect.objectContaining({ method: "DELETE" })
     );
   });

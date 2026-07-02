@@ -183,6 +183,37 @@ describe("content-service folder management endpoints", () => {
       .delete(`/api/management/folders/${folder.folderId}`)
       .expect(409);
   });
+
+  it("GIVEN a non-admin WHEN a schema folder is created or browsed THEN the endpoint returns 403", async () => {
+    app = await createApp();
+
+    await request(app.getHttpServer())
+      .get("/api/management/folders?parentFolderId=FLD-system-schemas")
+      .set("x-ecmp-permissions", "folder:read")
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post("/api/management/folders")
+      .set("x-ecmp-permissions", "folder:create")
+      .send({ name: "news", parentFolderId: "FLD-system-schemas" })
+      .expect(403);
+  });
+
+  it("GIVEN an administrator WHEN a schema folder is created THEN the endpoint returns 201", async () => {
+    app = await createApp();
+
+    await request(app.getHttpServer())
+      .post("/api/management/folders")
+      .set("x-ecmp-permissions", "content-type:create")
+      .send({ name: "news", parentFolderId: "FLD-system-schemas" })
+      .expect(201)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          name: "news",
+          path: "/system/schemas/news"
+        });
+      });
+  });
 });
 
 async function createApp(hasAssignedContent = false): Promise<INestApplication> {
