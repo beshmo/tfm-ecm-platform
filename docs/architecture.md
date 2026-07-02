@@ -1897,6 +1897,42 @@ Initial Playwright E2E workflows should include:
 * Publish a content instance.
 * Unpublish a content instance.
 
+### Coverage Controls
+
+Coverage is enforced at the package level through `@vitest/coverage-v8`. Each workspace package has its own `vitest.config.ts` that defines thresholds and reporting settings.
+
+Run coverage across all packages:
+
+```bash
+pnpm test:coverage
+```
+
+Run coverage for a single package:
+
+```bash
+pnpm --filter @ecmp/content-service test:coverage
+```
+
+Current per-package thresholds (statements):
+
+| Package | Threshold | Notes |
+|---|---|---|
+| `@ecmp/content-service` | 85% | Excludes interface-only files and `main.ts` |
+| `@ecmp/management-frontend` | 20% | Angular bootstrap files bring down aggregate |
+| `@ecmp/api-gateway` | 10% | Scaffold stage |
+| `@ecmp/identity-service` | 10% | Scaffold stage |
+| `@ecmp/delivery-service` | 10% | Scaffold stage |
+| `@ecmp/publication-service` | 10% | Scaffold stage |
+| `@ecmp/publication-worker` | 10% | Scaffold stage |
+| `@ecmp/shared-auth` | 80% | |
+| `@ecmp/shared-yaml` | 80% | |
+| `@ecmp/shared-types` | 80% | |
+| `@ecmp/shared-events` | 0% | Type-only package; zero runtime code |
+
+The per-layer targets defined above (domain 100%, application 100%, etc.) remain aspirational. Vitest 3.x does not support scoped coverage thresholds per directory within a package, so per-project enforcement of those targets is not currently implemented. As coverage infrastructure matures, the package-level thresholds should be tightened to approach the layer-specific goals.
+
+Coverage output is written to each package's `coverage/` directory (gitignored). HTML reports from `lcov` are available in `coverage/` for browser viewing.
+
 ## Cloud-Native Principles
 
 ECMP is designed around cloud-native application principles:

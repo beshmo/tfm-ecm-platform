@@ -17,7 +17,8 @@
 
 ## Testing
 
-- Vitest is the only configured test runner; no repo Playwright config or enforced coverage thresholds are present.
+- Vitest is the only configured test runner; no repo Playwright config.
+- Coverage is enforced via `@vitest/coverage-v8` (v8 provider) with per-package thresholds in each `vitest.config.ts`. Run `pnpm test:coverage` to check all packages. HTML reports land in each package's `coverage/` (gitignored).
 - Prefer focused package tests with `pnpm --filter <package> test -- <file>` before full `pnpm test` when iterating.
 
 ## Runtime
